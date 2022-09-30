@@ -1,13 +1,17 @@
 #![allow(dead_code)]
+#![allow(unused_variables)]
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::path::Path;
 
 fn main() {
-    let x = Plan::from_csv_path(&"test.csv");
-    println!("{:?}", x);
+    let x = Plan::from_csv_path(&"test.csv").unwrap();
+    println!("{:?}", x.summarize());
 }
-/// Container for instances of `Entry`.
+/// Container for `Entry`s.
+///
+/// Includes implementation of `Iterator` that returns a reference
+/// to the underlying `Entry`s
 #[derive(Debug)]
 struct Plan {
     entries: Vec<Entry>,
@@ -65,23 +69,88 @@ impl Plan {
     fn len(&self) -> usize {
         self.entries.len()
     }
-    fn summary<T>(&self) -> PlanSummary<T> {
-        let fnsku_count = self
+    /// Returns general information regarding contained `Entry`
+    ///
+    /// No immediate use implemented at the moment beyond QOL.
+    fn summarize(&self) -> PlanSummary {
+        let skus = self.entries().len();
+
+        // Collect FNSKUs into a set, removing duplicates
+        let unique_fnsku = self
             .entries()
             .iter()
             .map(|x| &x.fnsku)
+            .collect::<HashSet<_>>();
+
+        // Collect id into a set, and count
+        let entry_count = self
+            .entries()
+            .iter()
+            .map(|x| &x.id)
             .collect::<HashSet<_>>()
             .len();
-        todo!()
+
+        // Count unique FNSKU
+        let fnsku_count = unique_fnsku.len();
+
+        // Check if each FNSKU is of valid length (10 chars)
+        // TODO this should be returning on Option containing invalid_skus
+        // or a similiar implementation
+        let valid_fnsku = unique_fnsku.iter().all(|x| x.chars().count() == 10);
+
+        let loose_count = self
+            .entries()
+            .iter()
+            .filter(|x| x.pack_type.is_loose())
+            .count();
+
+        let packed_count = self
+            .entries()
+            .iter()
+            .filter(|x| x.pack_type.is_packed())
+            .count();
+
+        PlanSummary::new(
+            skus,
+            entry_count,
+            valid_fnsku,
+            // TODO implement ParentName for the plan that is derived from
+            // the origianl deserde source
+            packed_count,
+            loose_count,
+        )
     }
 }
-struct PlanSummary<T> {
-    skus: u32,
-    entry_count: u32,
-    invalid_fnskus: Option<T>,
-    packed_count: u32,
-    loose_count: u32,
-    parent_plan: Option<T>,
+#[derive(Debug)]
+struct PlanSummary {
+    skus: usize,
+    entry_count: usize,
+    valid_fnskus: bool,
+    packed_count: usize,
+    loose_count: usize,
+}
+impl PlanSummary {
+    fn new(
+        skus: usize,
+        entry_count: usize,
+        valid_fnskus: bool,
+        packed_count: usize,
+        loose_count: usize,
+    ) -> Self {
+        PlanSummary {
+            skus,
+            entry_count,
+            valid_fnskus,
+            packed_count,
+            loose_count,
+        }
+    }
+    /// Convenience method that calls `summarize()` from the caller.
+    ///
+    /// Function identically to Plan::summarize
+    fn summary(plan: Plan) -> Self {
+        plan.summarize()
+    }
 }
 impl Iterator for Plan {
     type Item = Entry;
@@ -93,6 +162,20 @@ impl Iterator for Plan {
 enum PackConfig {
     Loose,
     Packed,
+}
+impl PackConfig {
+    fn is_packed(&self) -> bool {
+        match self {
+            PackConfig::Loose => false,
+            PackConfig::Packed => true,
+        }
+    }
+    fn is_loose(&self) -> bool {
+        match self {
+            PackConfig::Loose => true,
+            PackConfig::Packed => false,
+        }
+    }
 }
 /// A single record from a Plan.
 ///
