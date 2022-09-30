@@ -1,96 +1,137 @@
 #![allow(dead_code)]
-use csv::Reader;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::path::Path;
 
 fn main() {
-    println!("Hello, world!");
+    let x = Plan::from_csv_path(&"test.csv");
+    println!("{:?}", x);
 }
+/// Container for instances of `Entry`.
+#[derive(Debug)]
 struct Plan {
-    cartons: Vec<Cartons>,
+    entries: Vec<Entry>,
 }
 impl Plan {
-    fn from_path(path: &Path) -> Result<(), csv::Error> {
-        csv::Reader::from_path(path)?
-            .deserialize::<PlanEntry>()
-            .for_each(|_entry| {});
+    /// Constructor which wraps around `serde` for deserialization of CSV files.
+    ///
+    /// Returns None when there is no valid `Entry`, and when IO fails to reach
+    /// the CSV file.
+    fn from_csv_path<P>(path: P) -> Option<Self>
+    where
+        P: AsRef<Path>,
+    {
+        // Check if path points to a file
+        Path::try_exists(path.as_ref()).ok()?;
 
-        Ok(())
+        // Call CSV reader with a referenced path
+        let mut entry_vec: Vec<Entry> = csv::Reader::from_path(path)
+            // Propagate IO / CSV error
+            .ok()?
+            .deserialize::<Entry>()
+            // Remove instances where deserializtion fails
+            .filter_map(|x| x.ok())
+            .collect::<Vec<Entry>>();
+
+        // Return None in cases where no entries are deserialized
+        // TODO implement returning Err
+        match entry_vec.is_empty() {
+            true => None,
+            false => {
+                // Sort entries by FNSKU prior to initializing
+                // I think this takes some overhead, but will save multiple
+                // sorts in the future. This SHOULD be the same as sorting by msku
+                entry_vec.sort_by(|x, y| x.fnsku.cmp(&y.fnsku));
+                Some(Plan::new(entry_vec))
+            }
+        }
+    }
+
+    /// General constructor for a Vec containing `Entry`
+    ///
+    /// `Plan` has no implementation for `Default` due to a `Plan` being
+    /// considered invalid when it contains no `Entry`.
+    fn new(entries: Vec<Entry>) -> Self {
+        Self { entries }
+    }
+
+    /// Returns a reference to a `Plan`'s individual entries.
+    ///
+    /// `Plan` implements `Iterator` if ownership is needed.
+    fn entries(&self) -> &Vec<Entry> {
+        &self.entries
+    }
+    /// Returns the `usize` of the contained `Vec<Entry>`
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+    fn summary<T>(&self) -> PlanSummary<T> {
+        let fnsku_count = self
+            .entries()
+            .iter()
+            .map(|x| &x.fnsku)
+            .collect::<HashSet<_>>()
+            .len();
+        todo!()
     }
 }
-enum Cartons {
-    Packed(Carton),
-    Loose(Carton),
+struct PlanSummary<T> {
+    skus: u32,
+    entry_count: u32,
+    invalid_fnskus: Option<T>,
+    packed_count: u32,
+    loose_count: u32,
+    parent_plan: Option<T>,
 }
-struct Carton {
-    group: Option<String>,
-    contents: Vec<Line>,
-    dims: Option<Dimensions>,
+impl Iterator for Plan {
+    type Item = Entry;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries.pop()
+    }
 }
-struct Line {
-    item: Unit,
-    amt: u32,
+#[derive(Deserialize, Debug)]
+enum PackConfig {
+    Loose,
+    Packed,
 }
-struct Dimensions {
-    length: f32,
-    width: f32,
-    height: f32,
-    weight: f32,
-}
-struct Unit {
-    fnsku: String,
-    weight: f32,
-}
-#[derive(Deserialize)]
-struct PlanEntry {
+/// A single record from a Plan.
+///
+/// Supports deserialization from the GoogleSheets csv
+#[derive(Deserialize, Debug)]
+struct Entry {
     #[serde(alias = "Info")]
-    info: Option<u32>,
+    id: u32,
+
     #[serde(alias = "FNSKU")]
-    fnsku: Option<String>,
+    fnsku: String,
+
     #[serde(alias = "Quantity")]
-    units: Option<u32>,
+    quantity: u32,
+
     #[serde(alias = "Pack Type")]
-    pack: Option<String>,
+    pack_type: PackConfig,
+
     #[serde(alias = "Staging Group")]
-    group: Option<String>,
+    staging_group: Option<String>,
+
     #[serde(alias = "Unit Weight")]
-    u_weight: Option<f32>,
+    unit_weight: Option<u32>,
+
     #[serde(alias = "Case QT")]
-    c_units: Option<u32>,
+    case_qt: Option<u32>,
+
     #[serde(alias = "Case Length")]
-    length: Option<f32>,
+    case_length: Option<u32>,
+
     #[serde(alias = "Case Width")]
-    width: Option<f32>,
+    case_width: Option<u32>,
+
     #[serde(alias = "Case Height")]
-    height: Option<f32>,
+    case_height: Option<u32>,
+
     #[serde(alias = "Case Weight")]
-    weight: Option<f32>,
-}
-impl PlanEntry {
-    fn into_carton(self) -> Option<()> {
-        match &*self.pack? {
-            "Loose" => _loose(self),
-            "Packed" => (),
-            _ => (),
-        }
-        fn _loose(pe: PlanEntry) -> Option<Carton> {
-            let unit = pe.fnsku.as_ref().and_then(|_| pe.u_weight).and_then(|_| {
-                Some(Unit {
-                    fnsku: pe.fnsku?,
-                    weight: pe.u_weight?,
-                })
-            });
-            let line = pe.units.and_then(|_| {
-                Some(Line {
-                    item: unit?,
-                    amt: pe.units?,
-                })
-            });
-            Some(Carton {
-                group: pe.group,
-                contents: vec![line?],
-                dims: None,
-            })
-        }
-    }
+    case_weight: Option<u32>,
+
+    #[serde(alias = "Total Cases")]
+    total_cases: Option<u32>,
 }
