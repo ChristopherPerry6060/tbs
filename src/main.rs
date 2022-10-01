@@ -156,17 +156,20 @@ impl Iterator for Plan {
     }
 }
 #[derive(Deserialize, Debug)]
+/// Describes physical packaging for an `Entry'
 enum PackConfig {
     Loose,
     Packed,
 }
 impl PackConfig {
+    /// Returns `true` if the containing `PackType` is `PackType::Packed`
     fn is_packed(&self) -> bool {
         match self {
             PackConfig::Loose => false,
             PackConfig::Packed => true,
         }
     }
+    /// Returns `true` if the containing `PackType` is `PackType::Loose`
     fn is_loose(&self) -> bool {
         match self {
             PackConfig::Loose => true,
