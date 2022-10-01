@@ -174,7 +174,44 @@ impl PackConfig {
         }
     }
 }
-/// A single record from a Plan.
+#[derive(Debug)]
+/// A `Vec` containing a reference to the underlying `Entry` for each
+/// expected physical case.
+///
+/// See `from_entry` method for details on implementation.
+struct ExpandedEntry<'a> {
+    cont: Vec<&'a Entry>,
+}
+impl<'a> ExpandedEntry<'a> {
+    /// Creates a reference to the `Entry` for each expected physical case.
+    ///
+    /// If `Entry` contains `Packconfig::Loose`, the resulting expansion occurs
+    /// a single time. Otherwise, expansion occurs
+    /// `Entry.quantity.checked_div(Entry.case_qt)`. If the division fails,
+    /// expansion occurs a single time.
+    fn from_entry(entry: &'a Entry) -> Self {
+        (0..entry.cases()).map(|_| entry).collect::<Self>()
+    }
+}
+// For convenience in accessing the underlying iterator
+impl<'a> Iterator for ExpandedEntry<'a> {
+    type Item = &'a Entry;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cont.pop()
+    }
+}
+// For convenience in using collect::<Self>() in from_entry
+impl<'a> FromIterator<&'a Entry> for ExpandedEntry<'a> {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = &'a Entry>,
+    {
+        ExpandedEntry {
+            cont: Vec::from_iter(iter),
+        }
+    }
+}
+/// A single line from a Plan.
 ///
 /// Supports deserialization from the GoogleSheets csv
 #[derive(Deserialize, Debug)]
