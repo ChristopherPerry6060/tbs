@@ -4,14 +4,8 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::path::Path;
 
-fn main() {
-    let x = Plan::from_csv_path(&"test.csv").unwrap();
-    println!("{:?}", x.summarize());
-}
+fn main() {}
 /// Container for `Entry`s.
-///
-/// Includes implementation of `Iterator` that returns a reference
-/// to the underlying `Entry`s
 #[derive(Debug)]
 struct Plan {
     entries: Vec<Entry>,
