@@ -66,6 +66,7 @@ impl Plan {
     /// Returns general information regarding contained `Entry`
     ///
     /// No immediate use implemented at the moment beyond QOL.
+    /// TODO This should be extracted to `PlanSummary::new()` impl
     fn summarize(&self) -> PlanSummary {
         let skus = self.entries().len();
 
@@ -115,6 +116,7 @@ impl Plan {
         )
     }
 }
+/// Describes various details of a `Plan`
 #[derive(Debug)]
 struct PlanSummary {
     skus: usize,
@@ -124,6 +126,7 @@ struct PlanSummary {
     loose_count: usize,
 }
 impl PlanSummary {
+    /// `PlanSummary` constructor
     fn new(
         skus: usize,
         entry_count: usize,
@@ -211,4 +214,34 @@ struct Entry {
 
     #[serde(alias = "Total Cases")]
     total_cases: Option<u32>,
+}
+impl Entry {
+    /// Returns `true` if the containing `PackType` is `PackType::Packed`
+    fn is_packed(&self) -> bool {
+        self.pack_type.is_packed()
+    }
+    /// Returns `true` if the containing `PackType` is `PackType::Loose`
+    fn is_loose(&self) -> bool {
+        self.pack_type.is_packed()
+    }
+    fn cases(&self) -> u32 {
+        // This is a very messy way to implement this
+        // TODO Return a result type instead of u32
+        match self.case_qt {
+            Some(x) => self.quantity.checked_div(x).unwrap_or(1),
+            _ => 1,
+        }
+    }
+    /// Creates a reference to the `Entry` for each expected physical case.
+    /// Wraps `ExpandedEntry::from_entry`.
+    ///
+    /// If `Entry` contains `Packconfig::Loose`, the resulting expansion occurs
+    /// a single time. Otherwise, expansion occurs
+    /// `Entry.quantity.checked_div(Entry.case_qt)`. If the division fails,
+    /// expansion occurs a single time.
+    ///
+    /// TODO try to extract this into a trait
+    fn as_expanded(&self) -> ExpandedEntry {
+        ExpandedEntry::from_entry(self)
+    }
 }
