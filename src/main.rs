@@ -262,26 +262,13 @@ impl Entry {
     }
     /// Returns `true` if the containing `PackType` is `PackType::Loose`
     fn is_loose(&self) -> bool {
-        self.pack_type.is_packed()
+        self.pack_type.is_loose()
     }
-    fn cases(&self) -> u32 {
-        // This is a very messy way to implement this
-        // TODO Return a result type instead of u32
+    /// Returns the cases of this [`Entry`].
+    fn cases(&self) -> Option<u32> {
         match self.case_qt {
-            Some(x) => self.quantity.checked_div(x).unwrap_or(1),
-            _ => 1,
+            Some(x) => self.quantity.checked_div(x),
+            _ => None,
         }
-    }
-    /// Creates a reference to the `Entry` for each expected physical case.
-    /// Wraps `ExpandedEntry::from_entry`.
-    ///
-    /// If `Entry` contains `Packconfig::Loose`, the resulting expansion occurs
-    /// a single time. Otherwise, expansion occurs
-    /// `Entry.quantity.checked_div(Entry.case_qt)`. If the division fails,
-    /// expansion occurs a single time.
-    ///
-    /// TODO try to extract this into a trait
-    fn as_expanded(&self) -> ExpandedEntry {
-        ExpandedEntry::from_entry(self)
     }
 }
