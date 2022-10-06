@@ -1,16 +1,22 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
 fn main() {}
 /// Container for `Entry`s.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct Plan {
     entries: Vec<Entry>,
 }
 impl Plan {
+    fn as_json_string(&self) {
+        println!(
+            "{:?}",
+            serde_json::to_string(self).expect("failed to write json")
+        );
+    }
     /// Constructor which wraps around `serde` for deserialization of CSV files.
     ///
     /// Returns None when there is no valid `Entry`, and when IO fails to reach
