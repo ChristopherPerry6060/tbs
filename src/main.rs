@@ -17,6 +17,31 @@ impl Plan {
             serde_json::to_string(self).expect("failed to write json")
         );
     }
+    /// Returns a reference to a `Plan`'s individual entries.
+    ///
+    /// `Plan` implements `Iterator` if ownership is needed.
+    fn entries(&self) -> &Vec<Entry> {
+        &self.entries
+    }
+    /// Expands each [`Entry`] contained within the plan to mimic how the physical
+    /// items will be once shipped
+    ///
+    /// An [`Entry`] that is described as 5 packed units with a case quantity
+    /// of 1 will be expanded to 5 identical entries
+    fn expand_entries(&mut self) {
+        let new_entries = self
+            .entries()
+            .iter()
+            .filter(|entry| entry.is_packed())
+            .flat_map(|packed_entries| {
+                (0..packed_entries.cases().unwrap_or(1))
+                    .map(|_| packed_entries.clone())
+                    .collect::<Self>()
+            })
+            .collect::<Self>();
+        self.entries.retain(|entry| entry.is_loose());
+        self.entries.extend(new_entries);
+    }
     /// Constructor which wraps around `serde` for deserialization of CSV files.
     ///
     /// Returns None when there is no valid `Entry`, and when IO fails to reach
