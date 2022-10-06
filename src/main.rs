@@ -76,6 +76,17 @@ impl Plan {
         }
     }
 
+    /// Returns the `usize` of the contained `Vec<Entry>`
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+    /// Counts the number of loose [`Entry`]
+    fn loose_count(&self) -> usize {
+        self.entries()
+            .iter()
+            .filter(|x| x.pack_type.is_loose())
+            .count()
+    }
     /// General constructor for a Vec containing `Entry`
     ///
     /// `Plan` has no implementation for `Default` due to a `Plan` being
