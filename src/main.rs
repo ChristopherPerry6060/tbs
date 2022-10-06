@@ -110,52 +110,16 @@ impl Plan {
     /// No immediate use implemented at the moment beyond QOL.
     /// TODO This should be extracted to `PlanSummary::new()` impl
     fn summarize(&self) -> PlanSummary {
-        let skus = self.entries().len();
-
-        // Collect FNSKUs into a set, removing duplicates
-        let unique_fnsku = self
-            .entries()
+        PlanSummary::from_plan(self)
+    }
+    fn unique_fnskus(&self) -> HashSet<&str> {
+        self.entries()
             .iter()
-            .map(|x| &x.fnsku)
-            .collect::<HashSet<_>>();
-
-        // Collect id into a set, and count
-        let entry_count = self
-            .entries()
-            .iter()
-            .map(|x| &x.id)
+            .map(|x| x.fnsku.as_str())
             .collect::<HashSet<_>>()
-            .len();
-
-        // Count unique FNSKU
-        let fnsku_count = unique_fnsku.len();
-
-        // Check if each FNSKU is of valid length (10 chars)
-        // TODO this should be returning on Option containing invalid_skus
-        // or a similiar implementation
-        let valid_fnsku = unique_fnsku.iter().all(|x| x.chars().count() == 10);
-
-        let loose_count = self
-            .entries()
-            .iter()
-            .filter(|x| x.pack_type.is_loose())
-            .count();
-
-        let packed_count = self
-            .entries()
-            .iter()
-            .filter(|x| x.pack_type.is_packed())
-            .count();
-
-        PlanSummary::new(
-            skus,
-            entry_count,
-            valid_fnsku,
-            // TODO implement ParentName for the plan that is derived from
-            // the origianl deserde source
-            packed_count,
-            loose_count,
-        )
+    }
+    fn valid_fnskus(&self) -> bool {
+        self.unique_fnskus().iter().all(|x| x.chars().count() == 10)
     }
 }
 /// Describes various details of a `Plan`
@@ -168,27 +132,15 @@ struct PlanSummary {
     loose_count: usize,
 }
 impl PlanSummary {
-    /// `PlanSummary` constructor
-    fn new(
-        skus: usize,
-        entry_count: usize,
-        valid_fnskus: bool,
-        packed_count: usize,
-        loose_count: usize,
-    ) -> Self {
+    /// Returns general information regarding contained `Entry`
+    fn from_plan(plan: &Plan) -> PlanSummary {
         PlanSummary {
-            skus,
-            entry_count,
-            valid_fnskus,
-            packed_count,
-            loose_count,
+            skus: plan.unique_fnskus().len(),
+            entry_count: plan.len(),
+            valid_fnskus: plan.valid_fnskus(),
+            packed_count: plan.packed_count(),
+            loose_count: plan.loose_count(),
         }
-    }
-    /// Convenience method that calls `summarize()` from the caller.
-    ///
-    /// Function identically to Plan::summarize
-    fn summary(plan: Plan) -> Self {
-        plan.summarize()
     }
 }
 impl Iterator for Plan {
