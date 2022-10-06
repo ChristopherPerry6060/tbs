@@ -94,21 +94,36 @@ impl Plan {
     fn new(entries: Vec<Entry>) -> Self {
         Self { entries }
     }
-
-    /// Returns a reference to a `Plan`'s individual entries.
-    ///
-    /// `Plan` implements `Iterator` if ownership is needed.
-    fn entries(&self) -> &Vec<Entry> {
-        &self.entries
+    /// Counts the number of packed [`Entry`]
+    fn packed_count(&self) -> usize {
+        self.entries()
+            .iter()
+            .filter(|x| x.pack_type.is_packed())
+            .count()
     }
-    /// Returns the `usize` of the contained `Vec<Entry>`
-    fn len(&self) -> usize {
-        self.entries.len()
-    }
-    /// Returns general information regarding contained `Entry`
+    /// Mutates the [`Plan`] by sorting the individual [`Entry`]s
     ///
-    /// No immediate use implemented at the moment beyond QOL.
-    /// TODO This should be extracted to `PlanSummary::new()` impl
+    /// Sorting order is as follows:
+    /// 1. PackType
+    /// 2. FNSKU (requires cloning)
+    /// 3. Case Qt
+    /// 4. Case Length
+    /// 4. Case Width
+    /// 4. Case Height
+    ///
+    ///
+    fn sort_in_place(&mut self) {
+        self.entries.sort_unstable_by_key(|entry| {
+            (
+                entry.is_loose(),
+                entry.fnsku().to_owned(),
+                entry.case_qt,
+                entry.case_length,
+                entry.case_width,
+                entry.case_height,
+            )
+        });
+    }
     fn summarize(&self) -> PlanSummary {
         PlanSummary::from_plan(self)
     }
