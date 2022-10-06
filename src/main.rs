@@ -197,7 +197,18 @@ impl Iterator for Plan {
         self.entries.pop()
     }
 }
-#[derive(Deserialize, Debug)]
+impl FromIterator<Entry> for Plan {
+    fn from_iter<I: IntoIterator<Item = Entry>>(iter: I) -> Self {
+        let mut plan = Plan {
+            entries: Vec::new(),
+        };
+        for i in iter {
+            plan.entries.push(i)
+        }
+        plan
+    }
+}
+#[derive(Deserialize, Debug, Clone, Serialize)]
 /// Describes physical packaging for an `Entry'
 enum PackConfig {
     Loose,
@@ -275,5 +286,10 @@ impl Entry {
             Some(x) => self.quantity.checked_div(x),
             _ => None,
         }
+    }
+}
+impl<'a> Entry {
+    fn fnsku(&'a self) -> &'a str {
+        &self.fnsku
     }
 }
