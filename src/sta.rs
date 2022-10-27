@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
-fn main() {}
 /// Container for `Entry`s.
 #[derive(Debug, Serialize)]
 struct Plan {
@@ -50,9 +49,6 @@ impl Plan {
     where
         P: AsRef<Path>,
     {
-        // Check if path points to a file
-        Path::try_exists(path.as_ref()).ok()?;
-
         // Call CSV reader with a referenced path
         let mut entry_vec: Vec<Entry> = csv::Reader::from_path(path)
             // Propagate IO / CSV error
