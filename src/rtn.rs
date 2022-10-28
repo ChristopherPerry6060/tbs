@@ -1,6 +1,9 @@
 use csv;
 use serde::Deserialize;
-use std::path::Path;
+use std::{
+    ffi::{OsStr, OsString},
+    path::{Path, PathBuf},
+};
 
 #[derive(Deserialize, Debug)]
 struct RemovalShipment {
@@ -34,21 +37,39 @@ impl RemovalShipment {
         self.fnsku.eq_ignore_ascii_case(fnsku)
     }
 }
-fn find_tracking_in_removal<P>(tracking: &str, path: P) -> Option<RemovalShipment>
-where
-    P: AsRef<Path>,
-{
-    csv::Reader::from_path(path)
-        .ok()?
-        .deserialize::<RemovalShipment>()
-        .filter_map(|x| x.ok())
-        .find(|x| x.match_tracking(&tracking))
+struct RemovalShipmentReport {
+    path: PathBuf,
 }
-#[test]
-fn find_match() {
-    find_tracking_in_removal(
-        "1Z77YA874237990210",
-        "C:\\Users\\Chris\\Downloads\\635656019284.csv",
-    )
-    .unwrap();
+impl RemovalShipmentReport {
+    fn new(path: OsString) -> Self {
+        RemovalShipmentReport {
+            path: PathBuf::from(path),
+        }
+    }
+    fn find_tracking(&self, tracking: &str) -> Option<RemovalShipment> {
+        csv::Reader::from_path(&self.path)
+            .ok()?
+            .deserialize::<RemovalShipment>()
+            .filter_map(|x| x.ok())
+            .find(|x| x.match_tracking(&tracking))
+    }
+}
+mod tests {
+    use super::*;
+
+    static AMZL_TRACKING_TEST: &str = "TBA303300920917";
+    static UPS_TRACKING_TEST: &str = "1Z55E7R34231089600";
+    static REMOVAL_SHIPMENT_TEST_PATH: &str = ".\\tests\\data\\RemovalShipment.csv";
+
+    #[test]
+    fn csv_path() {
+        assert!(Path::new(REMOVAL_SHIPMENT_TEST_PATH).exists())
+    }
+    #[test]
+    fn match_amzl_tracking() {
+        let path = OsString::from(REMOVAL_SHIPMENT_TEST_PATH);
+        assert!(RemovalShipmentReport::new(path)
+            .find_tracking(AMZL_TRACKING_TEST)
+            .is_some())
+    }
 }
