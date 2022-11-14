@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
 
-fn main() {}
 /// Container for `Entry`s.
 #[derive(Debug, Serialize)]
 struct Plan {
@@ -258,5 +257,15 @@ impl Entry {
 impl<'a> Entry {
     fn fnsku(&'a self) -> &'a str {
         &self.fnsku
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_plan_csv() {
+        Plan::from_csv_path("tests/data/STAPlan.csv").unwrap();
     }
 }
