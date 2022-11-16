@@ -34,13 +34,14 @@ impl RemovalShipmentRecord {
     fn match_fnsku(&self, fnsku: &str) -> bool {
         self.fnsku.eq_ignore_ascii_case(fnsku)
     }
-    /// Returns true if any contained tracking numbers match the tracking
+    /// Returns true if the tracking matches what is supplied
+    ///
+    /// WARN: This does nothing with removal records that have
+    /// multiple tracking records separated by a comma
+    /// FIXME: This cannot be used to check for a single tracking
+    /// if record is one of these "multi tracking" versions
     fn match_tracking(&self, tracking: &str) -> bool {
-        self.tracking
-            // tracking column can contain multiple tracking numbers
-            .split(',')
-            .map(|x| x.trim())
-            .any(|x| x.eq_ignore_ascii_case(tracking))
+        self.tracking().eq_ignore_ascii_case(tracking)
     }
     /// Returns a reference to the underlying tracking
     fn tracking(&self) -> &str {
@@ -80,16 +81,6 @@ impl RemovalShipmentReport {
             .collect::<Vec<_>>();
         Ok(RemovalShipmentReport { records })
     }
-    /// TODO: Im shocked this works so I need to take another look
-    /// to make sure it is actually working.
-    fn as_removal_sheet(&self) -> HashMap<&str, Vec<&RemovalShipmentRecord>> {
-        let tracking_numbers = self.unique_tracking_numbers();
-        let mut hm: HashMap<&str, Vec<&RemovalShipmentRecord>> = HashMap::new();
-        tracking_numbers.iter().for_each(|tracking| {
-            hm.insert(tracking, self.records_matching_tracking(tracking));
-        });
-        hm
-    }
     /// Returns any contained records that match the given tracking
     /// This *DOES NOT* split records containing multiple tracking numbers.
     fn records_matching_tracking(&self, tracking: &str) -> Vec<&RemovalShipmentRecord> {
@@ -101,6 +92,64 @@ impl RemovalShipmentReport {
         values
     }
 }
+impl<'a> RemovalShipmentReport {
+    fn as_removal_sheet(&'a self) -> RemovalSheets<'a> {
+        RemovalSheets::from_removal_shipment_report(self)
+    }
+}
+#[derive(Debug)]
+struct RemovalSheets<'a>(Vec<RemovalSheetsIter<'a>>);
+
+impl<'a> RemovalSheets<'a> {
+    fn from_removal_shipment_report(rsr: &'a RemovalShipmentReport) -> Self {
+        rsr.unique_tracking_numbers()
+            .into_iter()
+            .map(move |tracking| {
+                RemovalSheetsIter::from_removal_record(
+                    tracking,
+                    rsr.records_matching_tracking(tracking),
+                )
+            })
+            .collect()
+    }
+}
+impl<'a> RemovalSheets<'a> {
+    fn from_path<P>(path: P) -> Result<(), csv::Error>
+    where
+        P: Into<OsString>,
+    {
+        RemovalShipmentReport::from_path(path.into())?.as_removal_sheet();
+        Ok(())
+    }
+}
+
+impl<'a> Iterator for RemovalSheets<'a> {
+    type Item = RemovalSheetsIter<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop()
+    }
+}
+impl<'a> FromIterator<RemovalSheetsIter<'a>> for RemovalSheets<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = RemovalSheetsIter<'a>>,
+    {
+        RemovalSheets(Vec::from_iter(iter))
+    }
+}
+
+#[derive(Debug)]
+struct RemovalSheetsIter<'a> {
+    trackings: &'a str,
+    records: Vec<&'a RemovalShipmentRecord>,
+}
+
+impl<'a> RemovalSheetsIter<'a> {
+    fn from_removal_record(trackings: &'a str, records: Vec<&'a RemovalShipmentRecord>) -> Self {
+        RemovalSheetsIter { trackings, records }
+    }
+}
+
 mod tests {
     use super::*;
 
