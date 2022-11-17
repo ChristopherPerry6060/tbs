@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-#![allow(unused_variables)]
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -10,6 +9,22 @@ struct Plan {
     entries: Vec<Entry>,
 }
 impl Plan {
+    /// Mutates the inner Entrys so that measurements decrease in the order of
+    /// length, width, and height. Needed for normalizing dimensions among similar
+    /// skus.
+    fn sort_dimensions(&mut self) {
+        // Borrow check railed me here, don't mess with it.
+        for mut rec in &mut self.entries {
+            let mut dims = vec![rec.case_length, rec.case_width, rec.case_height];
+
+            if dims.iter().all(|x| x.is_some()) {
+                dims.sort_unstable_by_key(move |x| x.unwrap() as u32);
+                rec.case_length = dims.pop().unwrap();
+                rec.case_width = dims.pop().unwrap();
+                rec.case_height = dims.pop().unwrap();
+            }
+        }
+    }
     fn as_json_string(&self) {
         println!(
             "{:?}",
@@ -112,11 +127,12 @@ impl Plan {
         self.entries.sort_unstable_by_key(|entry| {
             (
                 entry.is_loose(),
-                entry.fnsku().to_owned(),
+                entry.fnsku().to_string(),
                 entry.case_qt,
-                entry.case_length,
-                entry.case_width,
-                entry.case_height,
+                { entry.case_length.map_or_else(|| 0, |l| l as u32) },
+                { entry.case_width.map_or_else(|| 0, |l| l as u32) },
+                { entry.case_height.map_or_else(|| 0, |l| l as u32) },
+                { entry.case_weight.map_or_else(|| 0, |l| l as u32) },
             )
         });
     }
@@ -162,13 +178,9 @@ impl Iterator for Plan {
 }
 impl FromIterator<Entry> for Plan {
     fn from_iter<I: IntoIterator<Item = Entry>>(iter: I) -> Self {
-        let mut plan = Plan {
-            entries: Vec::new(),
-        };
-        for i in iter {
-            plan.entries.push(i)
+        Plan {
+            entries: Vec::from_iter(iter),
         }
-        plan
     }
 }
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -200,37 +212,26 @@ impl PackConfig {
 struct Entry {
     #[serde(alias = "Info")]
     id: u32,
-
     #[serde(alias = "FNSKU")]
     fnsku: String,
-
     #[serde(alias = "Quantity")]
     quantity: u32,
-
     #[serde(alias = "Pack Type")]
     pack_type: PackConfig,
-
     #[serde(alias = "Staging Group")]
     staging_group: Option<String>,
-
     #[serde(alias = "Unit Weight")]
-    unit_weight: Option<u32>,
-
+    unit_weight: Option<f32>,
     #[serde(alias = "Case QT")]
     case_qt: Option<u32>,
-
     #[serde(alias = "Case Length")]
-    case_length: Option<u32>,
-
+    case_length: Option<f32>,
     #[serde(alias = "Case Width")]
-    case_width: Option<u32>,
-
+    case_width: Option<f32>,
     #[serde(alias = "Case Height")]
-    case_height: Option<u32>,
-
+    case_height: Option<f32>,
     #[serde(alias = "Case Weight")]
-    case_weight: Option<u32>,
-
+    case_weight: Option<f32>,
     #[serde(alias = "Total Cases")]
     total_cases: Option<u32>,
 }
@@ -250,6 +251,10 @@ impl Entry {
             _ => None,
         }
     }
+    /// Mutates the inner fields so that length, width, and height are
+    /// sorted in descending order.
+    /// This is assists in later normalizing of values
+    fn sort_dimensions(&mut self) {}
 }
 impl<'a> Entry {
     fn fnsku(&'a self) -> &'a str {
@@ -257,12 +262,33 @@ impl<'a> Entry {
     }
 }
 
+#[allow(unused_must_use)]
 #[cfg(test)]
 mod tests {
     use super::*;
+    static TEST_PLAN: &str = "tests/data/STAPlan.csv";
 
     #[test]
     fn deserialize_plan_csv() {
-        Plan::from_csv_path("tests/data/STAPlan.csv").unwrap();
+        Plan::from_csv_path(TEST_PLAN).unwrap();
+    }
+    #[test]
+    fn invalid_fnsku() {
+        assert!(!Plan::from_csv_path(TEST_PLAN).unwrap().valid_fnskus());
+    }
+    #[test]
+    fn sort_dimensions() {
+        let mut plan = Plan::from_csv_path(TEST_PLAN).unwrap();
+        plan.sort_dimensions();
+        plan.into_iter().for_each(|rec| {
+            let dimensions = vec![rec.case_height, rec.case_width, rec.case_length];
+            if dimensions.iter().all(|x| x.is_some()) {
+                assert!(dimensions
+                    .into_iter()
+                    .map(|x| x.unwrap() as u32)
+                    .collect::<Vec<_>>()
+                    .is_sorted());
+            };
+        });
     }
 }
