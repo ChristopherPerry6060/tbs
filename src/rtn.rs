@@ -1,13 +1,10 @@
+#![allow(dead_code)]
 use serde::Deserialize;
-use std::{
-    collections::HashMap,
-    ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, path::Path};
 
 /// A single record from a RemovalShipmentReport
-#[derive(Deserialize, Debug)]
-struct RemovalShipmentRecord {
+#[derive(Deserialize)]
+struct RemShipmentRecord {
     #[serde(alias = "request-date")]
     request_date: String,
     #[serde(alias = "order-id")]
@@ -26,7 +23,7 @@ struct RemovalShipmentRecord {
     tracking: String,
 }
 
-impl RemovalShipmentRecord {
+impl RemShipmentRecord {
     /// Returns a reference of the underlying FNSKU
     fn fnsku(&self) -> &str {
         self.fnsku.as_ref()
@@ -37,9 +34,9 @@ impl RemovalShipmentRecord {
     }
     /// Returns true if any of the contained tracking matches the input
     fn match_tracking(&self, tracking: &str) -> bool {
-        if self.tracking().contains(",") {
+        if self.tracking().contains(',') {
             self.tracking()
-                .split(",")
+                .split(',')
                 .any(|x| x.eq_ignore_ascii_case(tracking))
         } else {
             self.tracking().eq_ignore_ascii_case(tracking)
@@ -51,50 +48,50 @@ impl RemovalShipmentRecord {
     }
 }
 /// A container for RemovalShipmentRecord
-///
-/// Working with RemovalShipmentReport can be more intuitive than individual
-/// records. Reports are sourced from Amazon's fulfillment reports, and utilized
-/// as a simple csv "database".
-struct RemovalShipmentReport {
-    records: Vec<RemovalShipmentRecord>,
-}
-impl Iterator for RemovalShipmentReport {
-    type Item = RemovalShipmentRecord;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.records.pop()
-    }
-}
-impl RemovalShipmentReport {
+type RemShipmentReport = Vec<RemShipmentRecord>;
+
+impl RemovalShipment for RemShipmentReport {
     /// Returns any unique tracking numbers within the report
     ///
     /// This *DOES NOT* split records containing multiple tracking numbers.
-    fn unique_tracking_numbers(&self) -> Vec<String> {
-        self.records
-            .iter()
-            .map(|x| x.tracking().to_string())
-            .collect::<std::collections::HashSet<_>>()
+    fn unique_tracking(&self) -> Vec<&str> {
+        self.iter()
+            .map(|x| x.tracking())
+            .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>()
     }
     /// Constructs a `RemovalShipmentReport` from a path
-    /// TODO: This should take a generic argument
-    fn from_path(path: OsString) -> Result<Self, csv::Error> {
-        let records = csv::Reader::from_path(path)?
-            .deserialize::<RemovalShipmentRecord>()
-            .filter_map(|x| x.ok())
-            .collect::<Vec<_>>();
-        Ok(RemovalShipmentReport { records })
+    fn from_path<P>(path: P) -> Result<Self, csv::Error>
+    where
+        P: AsRef<Path>,
+    {
+        Ok(csv::Reader::from_path(path)?
+            .deserialize::<RemShipmentRecord>()
+            .filter_map(|records| records.ok())
+            .collect())
     }
     /// Returns any contained records that match the given tracking
     /// This *DOES NOT* split records containing multiple tracking numbers.
-    fn records_matching_tracking(self, tracking: &str) -> Vec<RemovalShipmentRecord> {
-        self.records
-            .into_iter()
-            .filter(move |records| records.match_tracking(&tracking))
-            .collect::<Vec<RemovalShipmentRecord>>()
+    fn filter_by_tracking(self, tracking: &str) -> RemShipmentReport {
+        self.into_iter()
+            .filter(|records| records.match_tracking(tracking))
+            .collect()
     }
 }
 
+/// The interface for dealing with RemovalShipments
+trait RemovalShipment {
+    fn unique_tracking(&self) -> Vec<&str>;
+
+    fn from_path<P>(p: P) -> Result<RemShipmentReport, csv::Error>
+    where
+        P: AsRef<Path>;
+
+    fn filter_by_tracking(self, tracking: &str) -> RemShipmentReport;
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -108,33 +105,27 @@ mod tests {
     }
     #[test]
     fn match_amzl_tracking() {
-        let path = OsString::from(REMOVAL_SHIPMENT_TEST_PATH);
-        assert_eq!(
-            RemovalShipmentReport::from_path(path)
-                .unwrap()
-                .records_matching_tracking(&AMZL_TRACKING_TEST)
-                .is_empty(),
-            false
-        );
+        assert!(!RemShipmentReport::from_path(REMOVAL_SHIPMENT_TEST_PATH)
+            .unwrap()
+            .filter_by_tracking(&AMZL_TRACKING_TEST)
+            .is_empty());
     }
     #[test]
     fn match_ups_tracking() {
-        let path = OsString::from(REMOVAL_SHIPMENT_TEST_PATH);
         assert_eq!(
-            RemovalShipmentReport::from_path(path)
+            RemShipmentReport::from_path(REMOVAL_SHIPMENT_TEST_PATH)
                 .unwrap()
-                .records_matching_tracking(&UPS_TRACKING_TEST)
+                .filter_by_tracking(&UPS_TRACKING_TEST)
                 .is_empty(),
             false
         );
     }
     #[test]
     fn unique_tracking_numbers() {
-        let path = OsString::from(REMOVAL_SHIPMENT_TEST_PATH);
         assert_eq!(
-            RemovalShipmentReport::from_path(path)
+            RemShipmentReport::from_path(REMOVAL_SHIPMENT_TEST_PATH)
                 .unwrap()
-                .unique_tracking_numbers()
+                .unique_tracking()
                 .is_empty(),
             false
         );
@@ -142,8 +133,7 @@ mod tests {
     #[test]
     // use `cargo test -- --nocapture' to see output
     fn list_unique_tracking_numbers() {
-        let path = OsString::from(REMOVAL_SHIPMENT_TEST_PATH);
-        let report = RemovalShipmentReport::from_path(path).unwrap();
-        dbg!(report.unique_tracking_numbers());
+        let report = RemShipmentReport::from_path(REMOVAL_SHIPMENT_TEST_PATH).unwrap();
+        dbg!(report.unique_tracking());
     }
 }
