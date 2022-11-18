@@ -1,7 +1,7 @@
 Info,FNSKU,Quantity,Pack Type,Staging Group,Unit Weight,Case QT,Case Length,Case Width,Case Height,Case Weight,Total Cases
 1,XPACKSKU01,5,Packed,,,1,10,11,12,10,
-2,XPACKSKU02,1,Packed,,,1,10,11,12,10,
-3,XPACKSKU03,10,Packed,,,2,10,11,12,10,
+2,XPACKSKU02,1,Packed,,,1,11,10,12,10,
+3,XPACKSKU03,10,Packed,,,2,12,11,10,10,
 4,XLOOSSKU01,10,Loose,R1,1,,,,,,
 5,XLOOSSKU02,140,Loose,R1,2,,,,,,
 6,XLOOSSKU03,8,Loose,R1,3,,,,,,
@@ -10,7 +10,7 @@ Info,FNSKU,Quantity,Pack Type,Staging Group,Unit Weight,Case QT,Case Length,Case
 9,XLOOSSKU02,140,Loose,R2,2,,,,,,
 10,XLOOSSKU03,8,Loose,R2,3,,,,,,
 11,XLOOSSKU04,1,Loose,R2,4,,,,,,
-12,XINVALID,6,Packed,,,2,15,15,10,21,
+12,XINVALID,6,Packed,,,2,15,8,10,21,
 19,,,,,,,,,,,
 20,,,,,,,,,,,
 21,,,,,,,,,,,
