@@ -25,12 +25,6 @@ impl Plan {
             }
         }
     }
-    fn as_json_string(&self) {
-        println!(
-            "{:?}",
-            serde_json::to_string(self).expect("failed to write json")
-        );
-    }
     /// Returns a reference to a `Plan`'s individual entries.
     ///
     /// `Plan` implements `Iterator` if ownership is needed.
@@ -136,9 +130,6 @@ impl Plan {
             )
         });
     }
-    fn summarize(&self) -> PlanSummary {
-        PlanSummary::from_plan(self)
-    }
     fn unique_fnskus(&self) -> HashSet<&str> {
         self.entries()
             .iter()
@@ -149,27 +140,7 @@ impl Plan {
         self.unique_fnskus().iter().all(|x| x.chars().count() == 10)
     }
 }
-/// Describes various details of a `Plan`
-#[derive(Debug)]
-struct PlanSummary {
-    skus: usize,
-    entry_count: usize,
-    valid_fnskus: bool,
-    packed_count: usize,
-    loose_count: usize,
-}
-impl PlanSummary {
-    /// Returns general information regarding contained `Entry`
-    fn from_plan(plan: &Plan) -> PlanSummary {
-        PlanSummary {
-            skus: plan.unique_fnskus().len(),
-            entry_count: plan.len(),
-            valid_fnskus: plan.valid_fnskus(),
-            packed_count: plan.packed_count(),
-            loose_count: plan.loose_count(),
-        }
-    }
-}
+
 impl Iterator for Plan {
     type Item = Entry;
     fn next(&mut self) -> Option<Self::Item> {
@@ -251,10 +222,6 @@ impl Entry {
             _ => None,
         }
     }
-    /// Mutates the inner fields so that length, width, and height are
-    /// sorted in descending order.
-    /// This is assists in later normalizing of values
-    fn sort_dimensions(&mut self) {}
 }
 impl<'a> Entry {
     fn fnsku(&'a self) -> &'a str {
