@@ -228,7 +228,116 @@ impl<'a> Entry {
         &self.fnsku
     }
 }
-
+struct Case {
+    length: u32,
+    width: u32,
+    heigh: u32,
+    weight: u32,
+}
+struct PackedEntry {
+    id: u32,
+    fnsku: String,
+    units: u32,
+    per_case: u32,
+    Case: Case,
+}
+struct LooseEntry {
+    id: u32,
+    fnsku: String,
+    units: u32,
+    unit_weight: u32,
+    group: u32,
+}
+struct BareEntry {
+    id: u32,
+    fnsku: String,
+    units: u32,
+}
+enum EntryParserResponse {
+    Packed(PackedEntry),
+    Loose(LooseEntry),
+    Bare(BareEntry),
+}
+/// Parses individual records from a shipping plan
+///
+/// This currently supports reading from a Csv plan that originates from
+/// the "GoogleDrive Shipping Plans".
+#[derive(Deserialize, Debug, Clone, Serialize)]
+struct EntryParser {
+    #[serde(alias = "Info")]
+    id: Option<u32>,
+    #[serde(alias = "FNSKU")]
+    fnsku: Option<String>,
+    #[serde(alias = "Quantity")]
+    units: Option<u32>,
+    #[serde(alias = "Pack Type")]
+    pack_type: Option<String>,
+    #[serde(alias = "Staging Group")]
+    staging_group: Option<String>,
+    #[serde(alias = "Unit Weight")]
+    unit_weight: Option<f32>,
+    #[serde(alias = "Case QT")]
+    case_qt: Option<u32>,
+    #[serde(alias = "Case Length")]
+    case_length: Option<f32>,
+    #[serde(alias = "Case Width")]
+    case_width: Option<f32>,
+    #[serde(alias = "Case Height")]
+    case_height: Option<f32>,
+    #[serde(alias = "Case Weight")]
+    case_weight: Option<f32>,
+    #[serde(alias = "Total Cases")]
+    total_cases: Option<u32>,
+}
+#[derive(Debug)]
+enum Error {
+    Static(String),
+}
+impl Error {
+    fn new(s: String) -> Self {
+        Error::Static(s)
+    }
+}
+impl EntryParser {
+    fn build(&self) -> Result<EntryParserResponse, Error> {
+        let Some(id) =  self.id else {
+            Error::Static(
+                format!("Entry has no id")
+            ).into()?
+        };
+        let Some(fnsku) = self.fnsku else {
+            Error::Static(
+                format!("Missing FNSKU from {}", id)
+            ).into()?
+        };
+        let Some(pack_type) = self.pack_type else {
+            Error::Static(
+                format!("Missing Pack Type from {}", id)
+            ).into()?
+        };
+        todo!();
+    }
+    fn from_string_record<P>(str_rec: csv::StringRecord) -> Result<EntryParser, csv::Error>
+    where
+        P: AsRef<Path>,
+    {
+        let header = csv::StringRecord::from(vec![
+            "Info",
+            "FNSKU",
+            "Quantity",
+            "Pack Type",
+            "Staging Group",
+            "Unit Weight",
+            "Case QT",
+            "Case Length",
+            "Case Width",
+            "Case Height",
+            "Case Weight",
+            "Total Cases",
+        ]);
+        str_rec.deserialize::<Self>(Some(&header))
+    }
+}
 #[allow(unused_must_use)]
 #[cfg(test)]
 mod tests {
