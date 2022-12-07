@@ -228,19 +228,22 @@ impl<'a> Entry {
         &self.fnsku
     }
 }
+#[derive(Debug)]
 struct Case {
     length: u32,
     width: u32,
     heigh: u32,
     weight: u32,
 }
+#[derive(Debug)]
 struct PackedEntry {
     id: u32,
     fnsku: String,
     units: u32,
     per_case: u32,
-    Case: Case,
+    case: Case,
 }
+#[derive(Debug)]
 struct LooseEntry {
     id: u32,
     fnsku: String,
@@ -248,11 +251,13 @@ struct LooseEntry {
     unit_weight: u32,
     group: u32,
 }
+#[derive(Debug)]
 struct BareEntry {
     id: u32,
     fnsku: String,
     units: u32,
 }
+#[derive(Debug)]
 enum EntryParserResponse {
     Packed(PackedEntry),
     Loose(LooseEntry),
@@ -262,7 +267,7 @@ enum EntryParserResponse {
 ///
 /// This currently supports reading from a Csv plan that originates from
 /// the "GoogleDrive Shipping Plans".
-#[derive(Deserialize, Debug, Clone, Serialize)]
+#[derive(Deserialize, Debug, Serialize)]
 struct EntryParser {
     #[serde(alias = "Info")]
     id: Option<u32>,
@@ -290,37 +295,44 @@ struct EntryParser {
     total_cases: Option<u32>,
 }
 #[derive(Debug)]
-enum Error {
-    Static(String),
+enum ErrorKind {
+    MissingId,
+    MissingFnsku,
+    MissingPackType,
+    MissingUnits,
 }
-impl Error {
-    fn new(s: String) -> Self {
-        Error::Static(s)
+impl std::error::Error for ErrorKind {}
+impl std::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorKind::MissingId => write!(f, "MissingId"),
+            ErrorKind::MissingFnsku => write!(f, "MissingFnsku"),
+            ErrorKind::MissingPackType => write!(f, "MissingPackType"),
+            ErrorKind::MissingUnits => write!(f, "MissingUnits"),
+        }
     }
 }
 impl EntryParser {
-    fn build(&self) -> Result<EntryParserResponse, Error> {
+    fn build(&self) -> Result<EntryParserResponse, ErrorKind> {
         let Some(id) =  self.id else {
-            Error::Static(
-                format!("Entry has no id")
-            ).into()?
+            return Err(ErrorKind::MissingId)
         };
-        let Some(fnsku) = self.fnsku else {
-            Error::Static(
-                format!("Missing FNSKU from {}", id)
-            ).into()?
+        let Some(fnsku) = &self.fnsku else {
+            return Err(ErrorKind::MissingFnsku)
         };
-        let Some(pack_type) = self.pack_type else {
-            Error::Static(
-                format!("Missing Pack Type from {}", id)
-            ).into()?
+        let Some(_pack_type) = &self.pack_type else {
+            return Err(ErrorKind::MissingPackType)
         };
-        todo!();
+        let Some(units) = self.units else {
+            return Err(ErrorKind::MissingUnits)
+        };
+        Ok(EntryParserResponse::Bare(BareEntry {
+            id,
+            fnsku: fnsku.to_string(),
+            units,
+        }))
     }
-    fn from_string_record<P>(str_rec: csv::StringRecord) -> Result<EntryParser, csv::Error>
-    where
-        P: AsRef<Path>,
-    {
+    fn from_string_record(str_rec: csv::StringRecord) -> Result<EntryParser, csv::Error> {
         let header = csv::StringRecord::from(vec![
             "Info",
             "FNSKU",
