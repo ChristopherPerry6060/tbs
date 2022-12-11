@@ -263,6 +263,10 @@ struct LooseEntry {
     unit_weight: u32,
     group: u32,
 }
+/// The smallest amount of information required to describe an Entry
+///
+/// Offers it's utility when prototyping plans. The "unit-like" nature of [`self`]
+/// can be easier compared to the more precise [`EntryFormat`] variants.
 #[derive(Debug)]
 struct BareEntry {
     id: u32,
@@ -270,7 +274,7 @@ struct BareEntry {
     units: u32,
 }
 #[derive(Debug)]
-enum EntryParserResponse {
+enum EntryFormat {
     Packed(PackedEntry),
     Loose(LooseEntry),
     Bare(BareEntry),
