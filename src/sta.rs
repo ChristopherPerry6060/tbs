@@ -1,7 +1,9 @@
 #![allow(dead_code)]
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
+use thiserror::Error;
 
 /// Container for `Entry`s.
 #[derive(Debug, Serialize)]
@@ -294,43 +296,107 @@ struct EntryParser {
     #[serde(alias = "Total Cases")]
     total_cases: Option<u32>,
 }
-#[derive(Debug)]
+#[derive(Debug, Error)]
 enum ErrorKind {
+    #[error("Row is missing an Id")]
     MissingId,
+    #[error("Row is missing an Fnsku")]
     MissingFnsku,
+    #[error("Row is missing the PackType")]
     MissingPackType,
+    #[error("Row is missing the unit quantity")]
     MissingUnits,
-}
-impl std::error::Error for ErrorKind {}
-impl std::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ErrorKind::MissingId => write!(f, "MissingId"),
-            ErrorKind::MissingFnsku => write!(f, "MissingFnsku"),
-            ErrorKind::MissingPackType => write!(f, "MissingPackType"),
-            ErrorKind::MissingUnits => write!(f, "MissingUnits"),
-        }
-    }
+    #[error("Row is declared as packed with dimensions missing")]
+    MissingPackedDimensions,
+    #[error("Row is declared as packed with weight missing")]
+    MissingPackedWeight,
+    #[error("A PackType is included, but cannot be recognized")]
+    InvalidPackType,
 }
 impl EntryParser {
-    fn build(&self) -> Result<EntryParserResponse, ErrorKind> {
-        let Some(id) =  self.id else {
+    fn build(&self) -> Result<EntryFormat, ErrorKind> {
+        self.check_bare_validity()?;
+        let pack_type: &str = &self.pack_type.as_ref().unwrap();
+        let entry = match pack_type {
+            "Packed" => EntryFormat::Packed(self.build_packed()?),
+            "Loose" => EntryFormat::Loose(self.build_loose()?),
+            _ => Err(ErrorKind::InvalidPackType)?,
+        };
+        Ok(entry)
+    }
+    fn build_loose(&self) -> Result<LooseEntry, ErrorKind> {
+        todo!();
+    }
+    /// Errors if [`Self`] lacks fields needed for building a [`BareEntry`].
+    ///
+    /// [EntryParser::check_bare_validity] can be utilized prior to creating the
+    /// other [`EntryFormat`] structs. [`BareEntry`] fiels are the "bare minimum"
+    /// needed to build an [`EntryFormat`]
+    fn check_bare_validity(&self) -> Result<(), ErrorKind> {
+        let Some(_id) =  self.id else {
             return Err(ErrorKind::MissingId)
         };
-        let Some(fnsku) = &self.fnsku else {
+        let Some(_fnsku) = &self.fnsku else {
             return Err(ErrorKind::MissingFnsku)
         };
         let Some(_pack_type) = &self.pack_type else {
             return Err(ErrorKind::MissingPackType)
         };
-        let Some(units) = self.units else {
+        let Some(_units) = self.units else {
             return Err(ErrorKind::MissingUnits)
         };
-        Ok(EntryParserResponse::Bare(BareEntry {
-            id,
+        Ok(())
+    }
+    /// Build a [`PackedEntry`] from the [EntryParser]
+    ///
+    /// Passing an Entry without [`PackedEntry`] fields will cause the build
+    /// to fail, returning a [`ErrorKind::MissingPackedWeight`], or
+    /// [`ErrorKind::MissingPackedDimensions`] Error.
+    fn build_packed(&self) -> Result<PackedEntry, ErrorKind> {
+        let weight = self
+            .case_weight
+            .ok_or_else(|| ErrorKind::MissingPackedWeight)?;
+
+        // Create a vec from the dimensions for iteration
+        let dims = vec![self.case_length, self.case_height, self.case_weight];
+
+        // Look if all dimensions are Some() > 0
+        if !dims.iter().all(|dim| dim.is_some_and(|dim| dim > 0.0)) {
+            return Err(ErrorKind::MissingPackedDimensions);
+        };
+
+        let dims_ref = &mut dims
+            .iter()
+            // Unwrap each dimension, round up, cast to u32
+            .map(|x| x.unwrap().ceil() as u32)
+            .collect::<Vec<u32>>();
+
+        // Sort the dimensions so they can be popped off to l x w x h & weight
+        dims_ref.sort_unstable();
+
+        let case = Case::from_sorted_dims(
+            // length
+            dims_ref.pop().unwrap(),
+            // width
+            dims_ref.pop().unwrap(),
+            // height
+            dims_ref.pop().unwrap(),
+            weight,
+        );
+        // Check if the bare information is there
+        self.check_bare_validity()?;
+
+        // I think there is a way to not clone the string
+        // this works for now
+        let fnsku = self.fnsku.as_ref().unwrap();
+
+        Ok(PackedEntry {
+            id: self.id.unwrap(),
             fnsku: fnsku.to_string(),
-            units,
-        }))
+            units: self.units.unwrap(),
+            per_case: self.case_qt.unwrap(),
+            case,
+        })
     }
     fn from_string_record(str_rec: csv::StringRecord) -> Result<EntryParser, csv::Error> {
         let header = csv::StringRecord::from(vec![
