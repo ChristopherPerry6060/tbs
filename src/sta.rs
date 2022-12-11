@@ -234,8 +234,18 @@ impl<'a> Entry {
 struct Case {
     length: u32,
     width: u32,
-    heigh: u32,
-    weight: u32,
+    height: u32,
+    weight: f32,
+}
+impl Case {
+    fn from_sorted_dims(length: u32, width: u32, height: u32, weight: f32) -> Self {
+        Case {
+            length,
+            width,
+            height,
+            weight,
+        }
+    }
 }
 #[derive(Debug)]
 struct PackedEntry {
