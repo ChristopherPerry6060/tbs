@@ -482,25 +482,18 @@ mod tests {
 
     #[test]
     fn deserialize_plan_csv() {
-        Plan::from_csv_path(TEST_PLAN).unwrap();
+        let rdr = csv::Reader::from_path(&TEST_PLAN);
+        let ep = rdr
+            .unwrap()
+            .into_records()
+            .map(|x| x.unwrap())
+            .map(|x| EntryParser::from_string_record(x).unwrap().build());
+        ep.into_iter()
+            .filter(|x| x.is_ok())
+            .for_each(|x| println!("{:?}", x.unwrap()));
     }
     #[test]
     fn invalid_fnsku() {
         assert!(!Plan::from_csv_path(TEST_PLAN).unwrap().valid_fnskus());
-    }
-    #[test]
-    fn sort_dimensions() {
-        let mut plan = Plan::from_csv_path(TEST_PLAN).unwrap();
-        plan.sort_dimensions();
-        plan.into_iter().for_each(|rec| {
-            let dimensions = vec![rec.case_height, rec.case_width, rec.case_length];
-            if dimensions.iter().all(|x| x.is_some()) {
-                assert!(dimensions
-                    .into_iter()
-                    .map(|x| x.unwrap() as u32)
-                    .collect::<Vec<_>>()
-                    .is_sorted());
-            };
-        });
     }
 }
