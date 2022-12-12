@@ -332,10 +332,26 @@ enum ErrorKind {
     MissingUnitWeight,
 }
 impl EntryParser {
+    /// Determines an [`EntryFormat`], returning the built [`EntryFormat`].
+    ///
+    /// [`EntryFormat`] contains variants based on which pieces of information
+    /// are available within the entry. Entries with "Loose" pack types will be
+    /// built into [`EntryFormat::Loose`]. Entries with "Packed" pack types will
+    /// be built into [`EntryFormat::Packed`].
+    ///
+    /// Currently there is no build path for the [`EntryFormat::Bare`] variant.
+    /// Future implementations are planned to use this variant as a "planning"
+    /// type, skipping over a few requirements in favor or ease of use.
     fn build(&self) -> Result<EntryFormat, ErrorKind> {
+        // Check if Bare entry can be created
         self.check_bare_validity()?;
+
         let pack_type: &str = &self.pack_type.as_ref().unwrap();
+        // Control flow determined by the declared type rather than
+        // some other method. This could be problematic once other inputs
+        // are considered for staging plans.
         let entry = match pack_type {
+            // WARN: I don't know if this is case sensitive
             "Packed" => EntryFormat::Packed(self.build_packed()?),
             "Loose" => EntryFormat::Loose(self.build_loose()?),
             _ => Err(ErrorKind::InvalidPackType)?,
@@ -393,6 +409,10 @@ impl EntryParser {
     /// to fail, returning a [`ErrorKind::MissingPackedWeight`], or
     /// [`ErrorKind::MissingPackedDimensions`] Error.
     fn build_packed(&self) -> Result<PackedEntry, ErrorKind> {
+        // Check if the bare information is there
+        self.check_bare_validity()?;
+
+        // A bunch of this should be extracted into a function
         let weight = self
             .case_weight
             .ok_or_else(|| ErrorKind::MissingPackedWeight)?;
@@ -423,8 +443,6 @@ impl EntryParser {
             dims_ref.pop().unwrap(),
             weight,
         );
-        // Check if the bare information is there
-        self.check_bare_validity()?;
 
         // I think there is a way to not clone the string
         // this works for now
