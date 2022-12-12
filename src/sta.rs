@@ -260,8 +260,8 @@ struct LooseEntry {
     id: u32,
     fnsku: String,
     units: u32,
-    unit_weight: u32,
-    group: u32,
+    gram_weight: u32,
+    group: String,
 }
 /// The smallest amount of information required to describe an Entry
 ///
@@ -326,6 +326,10 @@ enum ErrorKind {
     MissingPackedWeight,
     #[error("A PackType is included, but cannot be recognized")]
     InvalidPackType,
+    #[error("Row is declared as Loose with StagingGroup missing")]
+    MissingGroup,
+    #[error("Row is declared as Loose with UnitWeight missing")]
+    MissingUnitWeight,
 }
 impl EntryParser {
     fn build(&self) -> Result<EntryFormat, ErrorKind> {
@@ -338,8 +342,30 @@ impl EntryParser {
         };
         Ok(entry)
     }
+    /// Build a [`LooseEntry`] from the [`EntryParser`]
+    ///
+    /// Passing an Entry without [`LooseEntry`] fields will cause the build
+    /// to fail, returning a [`ErrorKind::MissingGroup`], or
+    /// [`ErrorKind::MissingUnitWeight`] Error.
     fn build_loose(&self) -> Result<LooseEntry, ErrorKind> {
-        todo!();
+        // Check if the bare information is there
+        self.check_bare_validity()?;
+
+        let fnsku = self.fnsku.as_ref().unwrap();
+        let group = self.staging_group.as_ref().unwrap();
+        let weight = self.unit_weight.unwrap();
+
+        // this converts the weight into grams, rounding up after conversion
+        // entirely due to the fact that I would prefer to work with u32
+        let gram_weight = (weight * 453.6).ceil() as u32;
+
+        Ok(LooseEntry {
+            id: self.id.unwrap(),
+            fnsku: fnsku.to_string(),
+            units: self.units.unwrap(),
+            gram_weight,
+            group: group.to_string(),
+        })
     }
     /// Errors if [`Self`] lacks fields needed for building a [`BareEntry`].
     ///
