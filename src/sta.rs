@@ -152,17 +152,14 @@ impl EntryParser {
         // Check if Bare entry can be created
         self.check_bare_validity()?;
 
-        let pack_type: &str = self.pack_type.as_ref().unwrap();
         // Control flow determined by the declared type rather than
         // some other method. This could be problematic once other inputs
         // are considered for staging plans.
-        let entry = match pack_type {
-            // WARN: I don't know if this is case sensitive
-            "Packed" => EntryFormat::Packed(self.build_packed()?),
-            "Loose" => EntryFormat::Loose(self.build_loose()?),
+        match &self.pack_type {
+            Some(pt) if pt == "Packed" => Ok(EntryFormat::Packed(self.build_packed()?)),
+            Some(pt) if pt == "Loose" => Ok(EntryFormat::Loose(self.build_loose()?)),
             _ => Err(ErrorKind::InvalidPackType)?,
-        };
-        Ok(entry)
+        }
     }
     /// Build a [`LooseEntry`] from the [`EntryParser`]
     ///
