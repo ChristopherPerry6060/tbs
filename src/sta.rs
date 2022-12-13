@@ -34,7 +34,7 @@ struct Case {
     length: u32,
     width: u32,
     height: u32,
-    weight: f32,
+    gram_weight: u32,
 }
 impl Case {
     fn from_sorted_dims(length: u32, width: u32, height: u32, weight: f32) -> Self {
@@ -42,7 +42,7 @@ impl Case {
             length,
             width,
             height,
-            weight,
+            gram_weight: weight as u32,
         }
     }
 }
