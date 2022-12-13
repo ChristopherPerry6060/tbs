@@ -12,6 +12,18 @@ trait Entry {
         Some(self.unit_grams()? * self.units())
     }
 }
+impl Entry for PackedEntry {
+    fn units(&self) -> u32 {
+        self.units
+    }
+    fn unit_grams(&self) -> Option<u32> {
+        Some(self.case.gram_weight.div_euclid(self.units))
+    }
+    fn as_expanded(&self) -> Option<Expanded<&Self>> {
+        let n = self.units().checked_div(self.per_case)?;
+        Some(Expanded { entry: self, n })
+    }
+}
 #[derive(Debug)]
 struct Expanded<T> {
     entry: T,
