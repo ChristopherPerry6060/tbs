@@ -3,6 +3,20 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+trait Entry {
+    fn units(&self) -> u32;
+    fn unit_grams(&self) -> Option<u32>;
+    fn as_expanded(&self) -> Option<Expanded<&Self>>;
+
+    fn total_grams(&self) -> Option<u32> {
+        Some(self.unit_grams()? * self.units())
+    }
+}
+#[derive(Debug)]
+struct Expanded<T> {
+    entry: T,
+    n: u32,
+}
 #[derive(Debug)]
 struct Case {
     length: u32,
