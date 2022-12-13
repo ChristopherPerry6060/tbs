@@ -123,6 +123,13 @@ enum ErrorKind {
     MissingPackedDimensions,
     #[error("Row is declared as packed with weight missing")]
     MissingPackedWeight,
+    #[error(
+        "Row is declared as packed with Units that are not evenly 
+        divisible by the CaseQt"
+    )]
+    NonDivisibleCaseQt,
+    #[error("Row is declared as packed with CaseQt missing")]
+    MissingCaseQt,
     #[error("A PackType is included, but cannot be recognized")]
     InvalidPackType,
     #[error("Row is declared as Loose with StagingGroup missing")]
@@ -145,7 +152,7 @@ impl EntryParser {
         // Check if Bare entry can be created
         self.check_bare_validity()?;
 
-        let pack_type: &str = &self.pack_type.as_ref().unwrap();
+        let pack_type: &str = self.pack_type.as_ref().unwrap();
         // Control flow determined by the declared type rather than
         // some other method. This could be problematic once other inputs
         // are considered for staging plans.
@@ -211,10 +218,23 @@ impl EntryParser {
         // Check if the bare information is there
         self.check_bare_validity()?;
 
-        // A bunch of this should be extracted into a function
-        let weight = self
-            .case_weight
-            .ok_or_else(|| ErrorKind::MissingPackedWeight)?;
+        // Check if the CaseQt is missing
+        let Some(case_qt) = self.case_qt else {
+            return Err(ErrorKind::MissingCaseQt)
+        };
+        if case_qt == 0 {
+            return Err(ErrorKind::MissingCaseQt);
+        };
+
+        // Div the total units by the CaseQt
+        self.units
+            // This is fine to do since it will just cause the following method
+            // to return None anyways.
+            .unwrap_or(0)
+            .checked_rem(case_qt)
+            .ok_or(ErrorKind::NonDivisibleCaseQt)?;
+
+        let weight = self.case_weight.ok_or(ErrorKind::MissingPackedWeight)?;
 
         // Create a vec from the dimensions for iteration
         let dims = vec![self.case_length, self.case_height, self.case_weight];
@@ -240,7 +260,7 @@ impl EntryParser {
             dims_ref.pop().unwrap(),
             // height
             dims_ref.pop().unwrap(),
-            weight,
+            weight * 453.6,
         );
 
         // I think there is a way to not clone the string
