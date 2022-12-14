@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -109,8 +108,18 @@ struct EntryParser {
     #[serde(alias = "Total Cases")]
     total_cases: Option<u32>,
 }
+type Result<T> = std::result::Result<T, ErrorKind>;
+
+impl From<csv::Error> for ErrorKind {
+    fn from(_value: csv::Error) -> Self {
+        Self::CsvError
+    }
+}
 #[derive(Debug, Error)]
-enum ErrorKind {
+// Something with this is still not right
+// TODO: Look through other rust crates to understand the type alias Result
+// error thing. This should not be public.
+pub enum ErrorKind {
     #[error("Row is missing an Id")]
     MissingId,
     #[error("Row is missing an Fnsku")]
@@ -136,6 +145,8 @@ enum ErrorKind {
     MissingGroup,
     #[error("Row is declared as Loose with UnitWeight missing")]
     MissingUnitWeight,
+    #[error("Unable to deserialized StringRecord")]
+    CsvError,
 }
 impl EntryParser {
     /// Determines an [`EntryFormat`], returning the built [`EntryFormat`].
@@ -148,7 +159,7 @@ impl EntryParser {
     /// Currently there is no build path for the [`EntryFormat::Bare`] variant.
     /// Future implementations are planned to use this variant as a "planning"
     /// type, skipping over a few requirements in favor or ease of use.
-    fn build(&self) -> Result<EntryFormat, ErrorKind> {
+    pub fn build(&self) -> Result<EntryFormat> {
         // Check if Bare entry can be created
         self.check_bare_validity()?;
 
@@ -166,7 +177,7 @@ impl EntryParser {
     /// Passing an Entry without [`LooseEntry`] fields will cause the build
     /// to fail, returning a [`ErrorKind::MissingGroup`], or
     /// [`ErrorKind::MissingUnitWeight`] Error.
-    fn build_loose(&self) -> Result<LooseEntry, ErrorKind> {
+    fn build_loose(&self) -> Result<LooseEntry> {
         // Check if the bare information is there
         self.check_bare_validity()?;
 
@@ -191,7 +202,7 @@ impl EntryParser {
     /// [EntryParser::check_bare_validity] can be utilized prior to creating the
     /// other [`EntryFormat`] structs. [`BareEntry`] fiels are the "bare minimum"
     /// needed to build an [`EntryFormat`]
-    fn check_bare_validity(&self) -> Result<(), ErrorKind> {
+    fn check_bare_validity(&self) -> Result<()> {
         let Some(_id) =  self.id else {
             return Err(ErrorKind::MissingId)
         };
@@ -211,7 +222,7 @@ impl EntryParser {
     /// Passing an Entry without [`PackedEntry`] fields will cause the build
     /// to fail, returning a [`ErrorKind::MissingPackedWeight`], or
     /// [`ErrorKind::MissingPackedDimensions`] Error.
-    fn build_packed(&self) -> Result<PackedEntry, ErrorKind> {
+    fn build_packed(&self) -> Result<PackedEntry> {
         // Check if the bare information is there
         self.check_bare_validity()?;
 
@@ -272,8 +283,8 @@ impl EntryParser {
             case,
         })
     }
-    fn from_string_record(str_rec: csv::StringRecord) -> Result<EntryParser, csv::Error> {
-        let header = csv::StringRecord::from(vec![
+    pub fn from_string_record(str_rec: csv::StringRecord) -> Result<EntryParser> {
+        let binding = csv::StringRecord::from(vec![
             "Info",
             "FNSKU",
             "Quantity",
@@ -287,7 +298,8 @@ impl EntryParser {
             "Case Weight",
             "Total Cases",
         ]);
-        str_rec.deserialize::<Self>(Some(&header))
+        let hdr = Some(&binding);
+        Ok(str_rec.deserialize::<Self>(hdr)?)
     }
 }
 #[allow(unused_must_use)]
