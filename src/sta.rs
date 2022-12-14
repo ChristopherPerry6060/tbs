@@ -23,6 +23,19 @@ impl Entry for PackedEntry {
         Some(Expanded { entry: self, n })
     }
 }
+impl Entry for LooseEntry {
+    fn units(&self) -> u32 {
+        self.units
+    }
+
+    fn unit_grams(&self) -> Option<u32> {
+        Some(self.gram_weight)
+    }
+
+    fn as_expanded(&self) -> Option<Expanded<&Self>> {
+        Some(Expanded { entry: self, n: 1 })
+    }
+}
 #[derive(Debug)]
 struct Expanded<T> {
     entry: T,
