@@ -7,11 +7,13 @@ default_job = "check"
 
 [jobs.check]
 command = ["cargo", "check", "--color", "always"]
-need_stdout = false
+need_stdout = true
+allow_warnings = false
 
 [jobs.check-all]
 command = ["cargo", "check", "--all-targets", "--color", "always"]
-need_stdout = false
+need_stdout = true
+allow_warnings = false
 watch = ["tests", "benches", "examples"]
 
 [jobs.clippy]
@@ -28,16 +30,19 @@ watch = ["tests", "benches", "examples"]
 [jobs.test]
 command = ["cargo", "test", "--color", "always"]
 need_stdout = true
+allow_warnings = false
 watch = ["tests"]
 
 [jobs.test-dbg]
 command = ["cargo", "test", "--", "--nocapture", "--color", "always"]
 need_stdout = true
+allow_warnings = false
 watch = ["tests"]
 
 [jobs.doc]
 command = ["cargo", "doc", "--color", "always", "--no-deps"]
-need_stdout = false
+need_stdout = true
+allow_warnings = false
 
 # if the doc compiles, then it opens in your browser and bacon switches
 # to the previous job
@@ -64,6 +69,7 @@ a = "job:check-all"
 i = "job:initial"
 o = "job:clippy-all"
 c = "job:clippy"
+e = "job:doc"
 d = "job:doc-open"
 t = "job:test"
 r = "job:run"
