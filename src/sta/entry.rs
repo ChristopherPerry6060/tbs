@@ -5,7 +5,7 @@ use thiserror::Error;
 /// Interface for the [`EntryFormat`] variants.
 ///
 /// Each [`EntryFormat`] will have its own implementation for [`Entry`].
-pub trait Entry {
+pub trait Entry: Serialize {
     /// Total unit quantity described by the [`Entry`].
     fn units(&self) -> u32;
 
@@ -20,6 +20,9 @@ pub trait Entry {
 
     fn total_gram_weight(&self) -> Option<u32> {
         Some(self.unit_grams()? * self.units())
+    }
+    fn as_expanded_json(&self) -> Option<String> {
+        serde_json::to_string(&self.as_expanded()?).ok()
     }
 }
 impl Entry for PackedEntry {
@@ -52,12 +55,20 @@ impl Entry for LooseEntry {
 /// Primarily used through the [`Entry::as_expanded`] trait implementation.
 /// [`Expanded`] form differs per format. In short, expansion
 /// will repeat the [`Entry`] once for each expected physical case.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Expanded<T> {
     entry: T,
     n: u32,
 }
-#[derive(Debug)]
+impl<T> Expanded<T> {
+    pub fn range(&self) -> u32 {
+        self.n
+    }
+    pub fn ref_entry(&self) -> &T {
+        &self.entry
+    }
+}
+#[derive(Debug, Serialize)]
 struct Case {
     length: u32,
     width: u32,
@@ -74,7 +85,7 @@ impl Case {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PackedEntry {
     id: u32,
     fnsku: String,
@@ -82,7 +93,7 @@ pub struct PackedEntry {
     per_case: u32,
     case: Case,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct LooseEntry {
     id: u32,
     fnsku: String,
@@ -94,24 +105,38 @@ pub struct LooseEntry {
 ///
 /// Offers it's utility when prototyping plans. The "unit-like" nature of [`self`]
 /// can be easier compared to the more precise [`EntryFormat`] variants.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BareEntry {
     id: u32,
     fnsku: String,
     units: u32,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum EntryFormat {
     Packed(PackedEntry),
     Loose(LooseEntry),
     Bare(BareEntry),
+}
+impl EntryFormat {
+    pub fn is_packed(&self) -> bool {
+        match self {
+            EntryFormat::Packed(_) => true,
+            _ => false,
+        }
+    }
+    pub fn is_loose(&self) -> bool {
+        match self {
+            EntryFormat::Loose(_) => true,
+            _ => false,
+        }
+    }
 }
 /// A builder, parser, and deserializer for types implementing [`Entry`]
 ///
 /// Holds parsing and deserialization logic for reading in csv plan records.
 /// use [`EntryParser::from_string_record`] to load a [`csv::StringRecord`],
 /// then call [`EntryParser::build`] to build.
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug)]
 pub struct EntryParser {
     #[serde(alias = "Info")]
     id: Option<u32>,
@@ -334,20 +359,4 @@ impl EntryParser {
 }
 #[allow(unused_must_use)]
 #[cfg(test)]
-mod tests {
-    use super::*;
-    static TEST_PLAN: &str = "tests/data/STAPlan.csv";
-
-    #[test]
-    fn deserialize_plan_csv() {
-        let rdr = csv::Reader::from_path(&TEST_PLAN);
-        let ep = rdr
-            .unwrap()
-            .into_records()
-            .map(|x| x.unwrap())
-            .map(|x| EntryParser::from_string_record(x).unwrap().build());
-        ep.into_iter()
-            .filter(|x| x.is_ok())
-            .for_each(|x| println!("{:?}", x.unwrap()));
-    }
-}
+mod tests {}
