@@ -2,50 +2,39 @@
 #![allow(dead_code)]
 #![allow(unused_must_use)]
 
-use crate::sta::entry::{Entry, EntryFormat, EntryParser};
+use crate::sta::entry::Entry;
+use crate::sta::result::Result;
 use serde::Serialize;
 use serde_json;
+use std::error::Error;
+use std::path::Path;
 
-#[derive(Serialize, Debug)]
-struct Plan {
-    inner: Vec<EntryFormat>,
+#[derive(Debug)]
+struct PlanBuilder {
+    entries: Vec<Result<Entry>>,
 }
 
-impl Plan {
-    fn new(inner: Vec<EntryFormat>) -> Self {
-        Self { inner }
-    }
-    fn to_buffer(&self) {
-        // This should work, even if it is surprising
-        let mut buffer: Vec<&EntryFormat> = Vec::new();
-        self.inner.iter().map(|inner| {
-            let pe_inner = match inner {
-                EntryFormat::Packed(pe) => pe.as_expanded(),
-                _ => None,
-            };
-            if let Some(expanded_inner) = pe_inner {
-                let i = expanded_inner.range();
-                for _ in 0..i {
-                    buffer.push(inner)
-                }
-            }
-        });
+impl PlanBuilder {
+    fn from_csv_path<P>(path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let mut vec = vec![];
+        let csv_reader = csv::Reader::from_path(path)?;
+        for wrapped_record in csv_reader.into_records() {
+            let record = wrapped_record?;
+            vec.push(Entry::from_csv_record(record));
+        }
+        Ok(PlanBuilder { entries: vec })
     }
 }
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-
-    static TEST_PLAN: &str = "tests/data/STAPlan.csv";
-
     #[test]
-    fn deserialize_plan_csv() {
-        let rdr = csv::Reader::from_path(&TEST_PLAN);
-        let parsed_entries = rdr
-            .unwrap()
-            .into_records()
-            .map(|x| x.unwrap())
-            .map(|x| EntryParser::from_string_record(x).unwrap().build());
-        let ok_entries = parsed_entries.filter_map(|x| x.ok()).collect::<Vec<_>>();
+    fn import_csv_to_plan_builder() {
+        static TEST_PLAN: &str = "tests/data/STAPlan.csv";
+        let p = PlanBuilder::from_csv_path(TEST_PLAN).unwrap();
+        dbg!(&p);
     }
 }
