@@ -1,74 +1,8 @@
 #![allow(dead_code)]
+use crate::sta::result::{ErrorKind, Result};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-/// Interface for the [`EntryFormat`] variants.
-///
-/// Each [`EntryFormat`] will have its own implementation for [`Entry`].
-pub trait Entry: Serialize {
-    /// Total unit quantity described by the [`Entry`].
-    fn units(&self) -> u32;
-
-    /// Weight of a single unit described by the [`Entry`]
-    fn unit_grams(&self) -> Option<u32>;
-
-    /// References the [`Entry`] in an [`Expanded`] form.
-    ///
-    /// [`Expanded`] form differs for each format. In short, expansion
-    /// will repeat the [`Entry`] once for each expected physical case.
-    fn as_expanded(&self) -> Option<Expanded<&Self>>;
-
-    fn total_gram_weight(&self) -> Option<u32> {
-        Some(self.unit_grams()? * self.units())
-    }
-    fn as_expanded_json(&self) -> Option<String> {
-        serde_json::to_string(&self.as_expanded()?).ok()
-    }
-}
-impl Entry for PackedEntry {
-    fn units(&self) -> u32 {
-        self.units
-    }
-    fn unit_grams(&self) -> Option<u32> {
-        Some(self.case.gram_weight.div_euclid(self.units))
-    }
-    fn as_expanded(&self) -> Option<Expanded<&Self>> {
-        let n = self.units().checked_div(self.per_case)?;
-        Some(Expanded { entry: self, n })
-    }
-}
-impl Entry for LooseEntry {
-    fn units(&self) -> u32 {
-        self.units
-    }
-
-    fn unit_grams(&self) -> Option<u32> {
-        Some(self.gram_weight)
-    }
-
-    fn as_expanded(&self) -> Option<Expanded<&Self>> {
-        Some(Expanded { entry: self, n: 1 })
-    }
-}
-/// A holder that references an [`Entry`] and instructions for expanding.
-///
-/// Primarily used through the [`Entry::as_expanded`] trait implementation.
-/// [`Expanded`] form differs per format. In short, expansion
-/// will repeat the [`Entry`] once for each expected physical case.
-#[derive(Debug, Serialize)]
-pub struct Expanded<T> {
-    entry: T,
-    n: u32,
-}
-impl<T> Expanded<T> {
-    pub fn range(&self) -> u32 {
-        self.n
-    }
-    pub fn ref_entry(&self) -> &T {
-        &self.entry
-    }
-}
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct Case {
     length: u32,
     width: u32,
@@ -85,51 +19,73 @@ impl Case {
         }
     }
 }
-#[derive(Debug, Serialize)]
-pub struct PackedEntry {
+#[derive(Debug, Serialize, Clone)]
+pub struct Packed {
     id: u32,
     fnsku: String,
     units: u32,
     per_case: u32,
     case: Case,
 }
-#[derive(Debug, Serialize)]
-pub struct LooseEntry {
+#[derive(Debug, Serialize, Clone)]
+pub struct Loose {
     id: u32,
     fnsku: String,
     units: u32,
     gram_weight: u32,
     group: String,
 }
-/// The smallest amount of information required to describe an Entry
-///
-/// Offers it's utility when prototyping plans. The "unit-like" nature of [`self`]
-/// can be easier compared to the more precise [`EntryFormat`] variants.
-#[derive(Debug, Serialize)]
-pub struct BareEntry {
-    id: u32,
-    fnsku: String,
-    units: u32,
+#[derive(Debug, Serialize, Clone)]
+pub enum Entry {
+    Packed(Packed),
+    Loose(Loose),
 }
-#[derive(Debug, Serialize)]
-pub enum EntryFormat {
-    Packed(PackedEntry),
-    Loose(LooseEntry),
-    Bare(BareEntry),
-}
-impl EntryFormat {
+impl Entry {
+    pub fn from_csv_record(str_rec: csv::StringRecord) -> Result<Self> {
+        EntryParser::from_string_record(str_rec)?.build()
+    }
+    /**
+    Returns the num of cases of this [`Entry`].
+
+    # Errors
+
+    This function will return an error if
+    * Total `units` is not evenly divisible by `per_case`.
+    * Total `units == 0`.
+    * `per_case == 0`.
+
+    */
+    fn num_of_cases(&self) -> Result<u32> {
+        // Destructure if Packed
+        let Entry::Packed(packed_entry) = self else {
+            // Return 1 if Loose
+            return Ok(1);
+        };
+        if !is_evenly_packed(packed_entry) {
+            return Err(ErrorKind::NonDivisibleCaseQt);
+        };
+        let case_qt = packed_entry.per_case;
+        let total_qt = packed_entry.units;
+        let Some(range) =  total_qt.checked_div_euclid(case_qt) else {
+            return Err(ErrorKind::NonDivisibleCaseQt);
+        };
+        Ok(range)
+    }
     pub fn is_packed(&self) -> bool {
-        match self {
-            EntryFormat::Packed(_) => true,
-            _ => false,
-        }
+        matches!(self, Entry::Packed(_))
     }
     pub fn is_loose(&self) -> bool {
-        match self {
-            EntryFormat::Loose(_) => true,
-            _ => false,
-        }
+        matches!(self, Entry::Loose(_))
     }
+}
+
+/// Returns `true` if `p.units / p.per_case` has a remainder that is `0`.
+fn is_evenly_packed(p: &Packed) -> bool {
+    let units = &p.units;
+    units
+        .checked_rem(p.per_case)
+        // check the unit quantity is evenly divisible by case quantity
+        .is_some_and(|remainder| remainder == 0)
 }
 /// A builder, parser, and deserializer for types implementing [`Entry`]
 ///
@@ -163,46 +119,7 @@ pub struct EntryParser {
     #[serde(alias = "Total Cases")]
     total_cases: Option<u32>,
 }
-type Result<T> = std::result::Result<T, ErrorKind>;
 
-impl From<csv::Error> for ErrorKind {
-    fn from(_value: csv::Error) -> Self {
-        Self::CsvError
-    }
-}
-#[derive(Debug, Error)]
-// Something with this is still not right
-// TODO: Look through other rust crates to understand the type alias Result
-// error thing. This should not be public.
-pub enum ErrorKind {
-    #[error("Row is missing an Id")]
-    MissingId,
-    #[error("Row is missing an Fnsku")]
-    MissingFnsku,
-    #[error("Row is missing the PackType")]
-    MissingPackType,
-    #[error("Row is missing the unit quantity")]
-    MissingUnits,
-    #[error("Row is declared as packed with dimensions missing")]
-    MissingPackedDimensions,
-    #[error("Row is declared as packed with weight missing")]
-    MissingPackedWeight,
-    #[error(
-        "Row is declared as packed with Units that are not evenly 
-        divisible by the CaseQt"
-    )]
-    NonDivisibleCaseQt,
-    #[error("Row is declared as packed with CaseQt missing")]
-    MissingCaseQt,
-    #[error("A PackType is included, but cannot be recognized")]
-    InvalidPackType,
-    #[error("Row is declared as Loose with StagingGroup missing")]
-    MissingGroup,
-    #[error("Row is declared as Loose with UnitWeight missing")]
-    MissingUnitWeight,
-    #[error("Unable to deserialized StringRecord")]
-    CsvError,
-}
 impl EntryParser {
     /// Builds into an [`EntryFormat`] the implements the [`Entry`] trait.
     ///
@@ -214,7 +131,7 @@ impl EntryParser {
     /// Currently there is no build path for the [`EntryFormat::Bare`] variant.
     /// Future implementations are planned to use this variant as a "planning"
     /// type, skipping over a few requirements in favor of quality of life.
-    pub fn build(&self) -> Result<EntryFormat> {
+    pub fn build(&self) -> Result<Entry> {
         // Check if Bare entry can be created
         self.check_bare_validity()?;
 
@@ -222,8 +139,8 @@ impl EntryParser {
         // some other method. This could be problematic once other inputs
         // are considered for staging plans.
         match &self.pack_type {
-            Some(pt) if pt == "Packed" => Ok(EntryFormat::Packed(self.build_packed()?)),
-            Some(pt) if pt == "Loose" => Ok(EntryFormat::Loose(self.build_loose()?)),
+            Some(pt) if pt == "Packed" => Ok(Entry::Packed(self.build_packed()?)),
+            Some(pt) if pt == "Loose" => Ok(Entry::Loose(self.build_loose()?)),
             _ => Err(ErrorKind::InvalidPackType)?,
         }
     }
@@ -232,7 +149,7 @@ impl EntryParser {
     /// Passing an Entry without [`LooseEntry`] fields will cause the build
     /// to fail, returning a [`ErrorKind::MissingGroup`], or
     /// [`ErrorKind::MissingUnitWeight`] Error.
-    fn build_loose(&self) -> Result<LooseEntry> {
+    fn build_loose(&self) -> Result<Loose> {
         // Check if the bare information is there
         self.check_bare_validity()?;
 
@@ -244,7 +161,7 @@ impl EntryParser {
         // entirely due to the fact that I would prefer to work with u32
         let gram_weight = (weight * 453.6).ceil() as u32;
 
-        Ok(LooseEntry {
+        Ok(Loose {
             id: self.id.unwrap(),
             fnsku: fnsku.to_string(),
             units: self.units.unwrap(),
@@ -277,7 +194,7 @@ impl EntryParser {
     /// Passing an Entry without [`PackedEntry`] fields will cause the build
     /// to fail, returning a [`ErrorKind::MissingPackedWeight`], or
     /// [`ErrorKind::MissingPackedDimensions`] Error.
-    fn build_packed(&self) -> Result<PackedEntry> {
+    fn build_packed(&self) -> Result<Packed> {
         // Check if the bare information is there
         self.check_bare_validity()?;
 
@@ -330,7 +247,7 @@ impl EntryParser {
         // this works for now
         let fnsku = self.fnsku.as_ref().unwrap();
 
-        Ok(PackedEntry {
+        Ok(Packed {
             id: self.id.unwrap(),
             fnsku: fnsku.to_string(),
             units: self.units.unwrap(),
@@ -359,4 +276,30 @@ impl EntryParser {
 }
 #[allow(unused_must_use)]
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    use super::*;
+
+    static TEST_PLAN: &str = "tests/data/STAPlan.csv";
+
+    fn isolate_ok_entries() -> Result<Vec<Entry>> {
+        let rdr = csv::Reader::from_path(TEST_PLAN);
+        let parsed_entries = rdr?
+            .into_records()
+            .map(|x| x.unwrap())
+            .map(|x| EntryParser::from_string_record(x).unwrap().build());
+        Ok(parsed_entries
+            .filter_map(|x| x.ok())
+            .collect::<Vec<Entry>>())
+    }
+    #[test]
+    fn check_ranges() {
+        let expect = vec![5, 1, 5, 1, 1, 1, 1, 1, 1, 1, 1, 3];
+        let ok_entries = isolate_ok_entries().unwrap();
+        let results: Vec<u32> = ok_entries
+            .iter()
+            .map(|entry_formats| entry_formats.num_of_cases().unwrap())
+            .collect();
+        assert_eq!(expect, results);
+    }
+}
