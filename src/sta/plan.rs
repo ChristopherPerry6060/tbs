@@ -18,8 +18,35 @@ impl Plan {
     fn new(entries: Vec<Entry>) -> Self {
         Self { entries }
     }
+    /// Push an [`Entry`] into the [`Plan`].
     fn push(&mut self, entry: Entry) {
         self.entries.push(entry);
+    }
+    /**
+    Sorts the [`Plan`] in-place.
+
+    Sort order
+    * Pack type
+    * FNSKU
+    * Case Length
+    * Case Width
+    * Case Height
+    * Case Weight
+    * Group Name
+
+    */
+    fn sort(&mut self) {
+        self.entries.sort_unstable_by_key(|entry| {
+            (
+                entry.is_loose(),
+                entry.get_fnsku().to_string(),
+                entry.try_case_length(),
+                entry.try_case_width(),
+                entry.try_case_height(),
+                entry.try_case_gram_weight(),
+                entry.try_group_name().unwrap_or_default().to_string(),
+            )
+        });
     }
 }
 #[derive(Debug, Default)]
