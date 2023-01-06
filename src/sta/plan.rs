@@ -9,23 +9,27 @@ use serde_json;
 use std::error::Error;
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct PlanBuilder {
     entries: Vec<Result<Entry>>,
+    keep_blank_fnsku: bool,
 }
 
 impl PlanBuilder {
+    fn push(&mut self, e: Result<Entry>) {
+        self.entries.push(e)
+    }
     fn from_csv_path<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
     {
-        let mut vec = vec![];
+        let mut pb = Self::default();
         let csv_reader = csv::Reader::from_path(path)?;
         for wrapped_record in csv_reader.into_records() {
             let record = wrapped_record?;
-            vec.push(Entry::from_csv_record(record));
+            pb.push(Entry::from_csv_record(record));
         }
-        Ok(PlanBuilder { entries: vec })
+        Ok(pb)
     }
 }
 #[cfg(test)]
