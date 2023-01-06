@@ -44,6 +44,25 @@ impl PlanBuilder {
         }
         Ok(pb)
     }
+    fn build(mut self) -> Plan {
+        if self.keep_error {
+            self.remove_errors();
+        };
+
+        let entry_vec = self
+            .entries
+            .into_iter()
+            .filter_map(|x| x.ok())
+            .collect::<Vec<Entry>>();
+        Plan::new(entry_vec)
+    }
+    fn remove_errors(&mut self) {
+        use crate::sta::result::ErrorKind; // TODO get rid of this
+        self.entries.drain_filter(|x| {
+            x.as_ref()
+                .is_err_and(|x| matches!(x, ErrorKind::MissingFnsku))
+        });
+    }
 }
 #[cfg(test)]
 mod test {
