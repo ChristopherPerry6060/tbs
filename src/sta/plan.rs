@@ -4,6 +4,7 @@
 
 use crate::sta::entry::Entry;
 use crate::sta::result::Result;
+use anyhow::anyhow;
 use serde::Serialize;
 use serde_json;
 use std::error::Error;
@@ -115,7 +116,12 @@ impl PlanBuilder {
             .into_iter()
             .filter_map(|x| x.ok())
             .collect::<Vec<Entry>>();
-        Plan::new(entry_vec)
+        let plan = Plan::new(entry_vec);
+        if plan.entries.is_empty() {
+            Err(anyhow!("Plan was built, but it is empty."))
+        } else {
+            Ok(plan)
+        }
     }
     fn remove_errors(&mut self) {
     /// Remove any [`Entry`] that is missing FNSKUs.
