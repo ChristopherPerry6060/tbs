@@ -125,6 +125,68 @@ pub enum Entry {
     Packed(Packed),
 }
 impl Entry {
+    /// Returns a reference to the contained FNSKU string of this [`Entry`].
+    pub fn get_fnsku(&self) -> &str {
+        match self {
+            Entry::Loose(l) => l.get_fnsku(),
+            Entry::Packed(p) => p.get_fnsku(),
+        }
+    }
+    /**
+    Returns a reference to the contained group name string of this [`Entry`].
+
+    This function will always return `None` If the entry is [`Self::Packed`].
+    */
+    pub fn try_group_name(&self) -> Option<&str> {
+        match self {
+            Entry::Loose(inner) => inner.try_group_name(),
+            Entry::Packed(inner) => inner.try_group_name(),
+        }
+    }
+    /**
+    Returns the contained case length of the [`Entry`].
+
+    This function will always return `None` If the entry is [`Self::Loose`].
+    */
+    pub fn try_case_length(&self) -> Option<u32> {
+        Some(match self {
+            Entry::Loose(inner) => inner.try_case_dimensions()?.length,
+            Entry::Packed(inner) => inner.try_case_dimensions()?.length,
+        })
+    }
+    /**
+    Returns the contained case width of the [`Entry`].
+
+    This function will always return `None` If the entry is [`Self::Loose`].
+    */
+    pub fn try_case_width(&self) -> Option<u32> {
+        Some(match self {
+            Entry::Loose(inner) => inner.try_case_dimensions()?.width,
+            Entry::Packed(inner) => inner.try_case_dimensions()?.width,
+        })
+    }
+    /**
+    Returns the contained case height of the [`Entry`].
+
+    This function will always return `None` If the entry is [`Self::Loose`].
+    */
+    pub fn try_case_height(&self) -> Option<u32> {
+        Some(match self {
+            Entry::Loose(inner) => inner.try_case_dimensions()?.height,
+            Entry::Packed(inner) => inner.try_case_dimensions()?.height,
+        })
+    }
+    /**
+    Returns the contained case weight (in grams) of the [`Entry`].
+
+    This function will always return `None` If the entry is [`Self::Loose`].
+    */
+    pub fn try_case_gram_weight(&self) -> Option<u32> {
+        Some(match self {
+            Entry::Loose(inner) => inner.try_case_dimensions()?.gram_weight,
+            Entry::Packed(inner) => inner.try_case_dimensions()?.gram_weight,
+        })
+    }
     /**
     Attemps to build an [`Entry`] from a single CSV record.
 
