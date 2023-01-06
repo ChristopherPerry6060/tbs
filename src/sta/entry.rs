@@ -19,6 +19,11 @@ impl Case {
         }
     }
 }
+/**
+A single "packed" record from a shipping plan.
+
+Packed represents __box(es)__ that will contain a single Sku.
+*/
 #[derive(Debug, Serialize, Clone)]
 pub struct Packed {
     id: u32,
@@ -27,6 +32,11 @@ pub struct Packed {
     per_case: u32,
     case: Case,
 }
+/**
+A single "loose" record from a shipping plan.
+
+Loose represents items that will likely be packed with different items.
+*/
 #[derive(Debug, Serialize, Clone)]
 pub struct Loose {
     id: u32,
@@ -35,12 +45,27 @@ pub struct Loose {
     gram_weight: u32,
     group: String,
 }
+
+/**
+Various representations of a single row on a "shipping plan".
+
+* [`Entry::Loose`] represents an item destined for a mixed box.
+* [`Entry::Packed`] represent an item destined for a case packing
+*/
 #[derive(Debug, Serialize, Clone)]
 pub enum Entry {
-    Packed(Packed),
     Loose(Loose),
+    Packed(Packed),
 }
 impl Entry {
+    /**
+    Attemps to build an [`Entry`] from a single CSV record.
+
+    # Errors
+
+    This function will return an error if the record is unable to be
+    deserialized into an Entry.
+    */
     pub fn from_csv_record(str_rec: csv::StringRecord) -> Result<Self> {
         EntryParser::from_string_record(str_rec)?.build()
     }
@@ -71,15 +96,21 @@ impl Entry {
         };
         Ok(range)
     }
+    /**
+    Returns `true` if the [`Entry`] is [`Packed`].
+    */
     pub fn is_packed(&self) -> bool {
         matches!(self, Entry::Packed(_))
     }
+    /**
+    Returns `true` if the [`Entry`] is [`Loose`].
+    */
     pub fn is_loose(&self) -> bool {
         matches!(self, Entry::Loose(_))
     }
 }
 
-/// Returns `true` if `p.units / p.per_case` has a remainder that is `0`.
+/// Returns `true` if `p.units / p.per_case` has a remainder `== 0`.
 fn is_evenly_packed(p: &Packed) -> bool {
     let units = &p.units;
     units
@@ -87,11 +118,15 @@ fn is_evenly_packed(p: &Packed) -> bool {
         // check the unit quantity is evenly divisible by case quantity
         .is_some_and(|remainder| remainder == 0)
 }
-/// A builder, parser, and deserializer for types implementing [`Entry`]
-///
-/// Holds parsing and deserialization logic for reading in csv plan records.
-/// use [`EntryParser::from_string_record`] to load a [`csv::StringRecord`],
-/// then call [`EntryParser::build`] to build.
+/**
+A helper for dealing with input strings, mostly CSV shipping plans.
+
+You should be using [`Entry::from_csv_record`] instead.
+
+Holds parsing and deserialization logic for reading in csv plan records.
+use [`EntryParser::from_string_record`] to load a [`csv::StringRecord`],
+then call [`EntryParser::build`] to build.
+*/
 #[derive(Deserialize, Debug)]
 pub struct EntryParser {
     #[serde(alias = "Info")]
@@ -99,6 +134,7 @@ pub struct EntryParser {
     #[serde(alias = "FNSKU")]
     fnsku: Option<String>,
     #[serde(alias = "Quantity")]
+    #[serde(alias = "Total Quantity")]
     units: Option<u32>,
     #[serde(alias = "Pack Type")]
     pack_type: Option<String>,
@@ -121,34 +157,24 @@ pub struct EntryParser {
 }
 
 impl EntryParser {
-    /// Builds into an [`EntryFormat`] the implements the [`Entry`] trait.
-    ///
-    /// [`EntryFormat`] contains variants based on which pieces of information
-    /// are available within the record. Entries with "Loose" pack types will be
-    /// built into [`EntryFormat::Loose`]. Entries with "Packed" pack types will
-    /// be built into [`EntryFormat::Packed`].
-    ///
-    /// Currently there is no build path for the [`EntryFormat::Bare`] variant.
-    /// Future implementations are planned to use this variant as a "planning"
-    /// type, skipping over a few requirements in favor of quality of life.
-    pub fn build(&self) -> Result<Entry> {
+    /// Attempt to build an [`Entry`] from an [`EntryParser`]
+    fn build(&self) -> Result<Entry> {
         // Check if Bare entry can be created
         self.check_bare_validity()?;
 
-        // Control flow determined by the declared type rather than
-        // some other method. This could be problematic once other inputs
-        // are considered for staging plans.
         match &self.pack_type {
             Some(pt) if pt == "Packed" => Ok(Entry::Packed(self.build_packed()?)),
             Some(pt) if pt == "Loose" => Ok(Entry::Loose(self.build_loose()?)),
             _ => Err(ErrorKind::InvalidPackType)?,
         }
     }
-    /// Build a [`LooseEntry`] from the [`EntryParser`]
-    ///
-    /// Passing an Entry without [`LooseEntry`] fields will cause the build
-    /// to fail, returning a [`ErrorKind::MissingGroup`], or
-    /// [`ErrorKind::MissingUnitWeight`] Error.
+    /**
+    Build a [`Entry::Loose`] from the [`EntryParser`]
+
+    Passing an Entry without [`Loose`] fields will cause the build
+    to fail, returning a [`ErrorKind::MissingGroup`], or
+    [`ErrorKind::MissingUnitWeight`] Error.
+    */
     fn build_loose(&self) -> Result<Loose> {
         // Check if the bare information is there
         self.check_bare_validity()?;
@@ -169,11 +195,7 @@ impl EntryParser {
             group: group.to_string(),
         })
     }
-    /// Errors if [`Self`] lacks fields needed for building a [`BareEntry`].
-    ///
-    /// [EntryParser::check_bare_validity] can be utilized prior to creating the
-    /// other [`EntryFormat`] structs. [`BareEntry`] fiels are the "bare minimum"
-    /// needed to build an [`EntryFormat`]
+    // Checks to see if essential components are present to build the entry
     fn check_bare_validity(&self) -> Result<()> {
         let Some(_id) =  self.id else {
             return Err(ErrorKind::MissingId)
@@ -189,11 +211,13 @@ impl EntryParser {
         };
         Ok(())
     }
-    /// Build a [`PackedEntry`] from the [EntryParser]
-    ///
-    /// Passing an Entry without [`PackedEntry`] fields will cause the build
-    /// to fail, returning a [`ErrorKind::MissingPackedWeight`], or
-    /// [`ErrorKind::MissingPackedDimensions`] Error.
+    /**
+    Build a [`PackedEntry`] from the [EntryParser]
+
+    Passing an Entry without [`PackedEntry`] fields will cause the build
+    to fail, returning a [`ErrorKind::MissingPackedWeight`], or
+    [`ErrorKind::MissingPackedDimensions`] Error.
+    */
     fn build_packed(&self) -> Result<Packed> {
         // Check if the bare information is there
         self.check_bare_validity()?;
@@ -230,7 +254,6 @@ impl EntryParser {
             .map(|x| x.unwrap().ceil() as u32)
             .collect::<Vec<u32>>();
 
-        // Sort the dimensions so they can be popped off to l x w x h & weight
         dims_ref.sort_unstable();
 
         let case = Case::from_sorted_dims(
@@ -243,8 +266,6 @@ impl EntryParser {
             weight * 453.6,
         );
 
-        // I think there is a way to not clone the string
-        // this works for now
         let fnsku = self.fnsku.as_ref().unwrap();
 
         Ok(Packed {
