@@ -15,6 +15,7 @@ struct Plan {
 }
 
 impl Plan {
+    /// Creates a new [`Plan`].
     fn new(entries: Vec<Entry>) -> Self {
         Self { entries }
     }
@@ -50,15 +51,40 @@ impl Plan {
     }
 }
 #[derive(Debug, Default)]
+/**
+Convenient builder for a [`Plan`].
+
+Comes with various default options, all of which can be changed prior to
+building.
+
+Options:
+* `keep_error`: default `false`
+    * Discards all errors
+*/
 struct PlanBuilder {
     entries: Vec<Result<Entry>>,
     keep_error: bool,
 }
 
 impl PlanBuilder {
+    /**
+    Push a `Result<Entry>` to the plan
+
+    The builder holds `Result` wrapped entries to have the control over
+    which options are discarded prior to building.
+    */
     fn push(&mut self, e: Result<Entry>) {
         self.entries.push(e)
     }
+
+    /**
+    Construct a [`Plan`] from a path that points to a CSV.
+
+    # Errors
+
+    This function will return an error if the CSV format is incorrect, or
+    deserialization fails to return a valid entry.
+    */
     fn from_csv_path<P>(path: P) -> Result<Self>
     where
         P: AsRef<Path>,
@@ -71,7 +97,15 @@ impl PlanBuilder {
         }
         Ok(pb)
     }
-    fn build(mut self) -> Plan {
+    /**
+    Consume the [`PlanBuilder`] and return the generate [`Plan`].
+
+    # Errors
+
+    This function will return an error if the resulting [`Plan`] is empty once
+    all of the errors are removed.
+    */
+    fn build(mut self) -> std::result::Result<Plan, anyhow::Error> {
         if self.keep_error {
             self.remove_errors();
         };
@@ -84,6 +118,7 @@ impl PlanBuilder {
         Plan::new(entry_vec)
     }
     fn remove_errors(&mut self) {
+    /// Remove any [`Entry`] that is missing FNSKUs.
         use crate::sta::result::ErrorKind; // TODO get rid of this
         self.entries.drain_filter(|x| {
             x.as_ref()
