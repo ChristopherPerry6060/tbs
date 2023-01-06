@@ -10,6 +10,19 @@ use std::error::Error;
 use std::path::Path;
 
 #[derive(Debug, Default)]
+struct Plan {
+    entries: Vec<Entry>,
+}
+
+impl Plan {
+    fn new(entries: Vec<Entry>) -> Self {
+        Self { entries }
+    }
+    fn push(&mut self, entry: Entry) {
+        self.entries.push(entry);
+    }
+}
+#[derive(Debug, Default)]
 struct PlanBuilder {
     entries: Vec<Result<Entry>>,
     keep_blank_fnsku: bool,
