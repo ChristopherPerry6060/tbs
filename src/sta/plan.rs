@@ -108,7 +108,7 @@ impl PlanBuilder {
     */
     fn build(mut self) -> std::result::Result<Plan, anyhow::Error> {
         if self.keep_error {
-            self.remove_errors();
+            self.remove_entries_without_fnskus();
         };
 
         let entry_vec = self
@@ -123,8 +123,8 @@ impl PlanBuilder {
             Ok(plan)
         }
     }
-    fn remove_errors(&mut self) {
     /// Remove any [`Entry`] that is missing FNSKUs.
+    fn remove_entries_without_fnskus(&mut self) {
         use crate::sta::result::ErrorKind; // TODO get rid of this
         self.entries.drain_filter(|x| {
             x.as_ref()
