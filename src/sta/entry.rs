@@ -2,7 +2,7 @@
 use crate::sta::result::{ErrorKind, Result};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Copy)]
 struct Case {
     length: u32,
     width: u32,
@@ -32,6 +32,35 @@ pub struct Packed {
     per_case: u32,
     case: Case,
 }
+impl EntryFormat for Packed {
+    fn get_fnsku<'a>(&'a self) -> &'a str {
+        &self.fnsku
+    }
+
+    fn get_units(&self) -> u32 {
+        self.units
+    }
+
+    fn get_weight(&self) -> u32 {
+        self.case.gram_weight
+    }
+
+    fn try_num_of_cases(&self) -> Option<u32> {
+        self.units.checked_div_euclid(self.per_case)
+    }
+
+    fn try_case_dimensions(&self) -> Option<Case> {
+        Some(self.case)
+    }
+
+    fn try_group_name<'a>(&'a self) -> Option<&'a str> {
+        None
+    }
+
+    fn try_per_case(&self) -> Option<u32> {
+        Some(self.per_case)
+    }
+}
 /**
 A single "loose" record from a shipping plan.
 
@@ -44,6 +73,44 @@ pub struct Loose {
     units: u32,
     gram_weight: u32,
     group: String,
+}
+impl EntryFormat for Loose {
+    fn get_fnsku<'a>(&'a self) -> &'a str {
+        &self.fnsku
+    }
+
+    fn get_units(&self) -> u32 {
+        self.units
+    }
+
+    fn get_weight(&self) -> u32 {
+        self.gram_weight
+    }
+
+    fn try_num_of_cases(&self) -> Option<u32> {
+        Some(1)
+    }
+
+    fn try_case_dimensions(&self) -> Option<Case> {
+        None
+    }
+
+    fn try_group_name<'a>(&'a self) -> Option<&'a str> {
+        Some(&self.group)
+    }
+
+    fn try_per_case(&self) -> Option<u32> {
+        None
+    }
+}
+trait EntryFormat {
+    fn get_fnsku<'a>(&'a self) -> &'a str;
+    fn get_units(&self) -> u32;
+    fn get_weight(&self) -> u32;
+    fn try_num_of_cases(&self) -> Option<u32>;
+    fn try_case_dimensions(&self) -> Option<Case>;
+    fn try_group_name<'a>(&'a self) -> Option<&'a str>;
+    fn try_per_case(&self) -> Option<u32>;
 }
 
 /**
