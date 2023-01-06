@@ -132,19 +132,29 @@ impl PlanBuilder {
         });
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
-    #[test]
-    fn import_csv_to_plan_builder() {
+    fn load_csv_into_builder() -> Result<PlanBuilder> {
         static TEST_PLAN: &str = "tests/data/STAPlan.csv";
-        PlanBuilder::from_csv_path(TEST_PLAN).unwrap();
+        PlanBuilder::from_csv_path(TEST_PLAN)
+    }
+    #[test]
+    fn unwrap_plan_builder() {
+        let builder = load_csv_into_builder();
+        builder.unwrap();
     }
     #[test]
     fn build_and_remove_blank_fnsku() {
-        static TEST_PLAN: &str = "tests/data/STAPlan.csv";
-        let p = PlanBuilder::from_csv_path(TEST_PLAN).unwrap();
-        let builds = p.build();
-        dbg!(&builds);
+        let builder = load_csv_into_builder().unwrap();
+        builder.build().unwrap();
+    }
+    #[test]
+    fn sort_built_plan() {
+        let builder = load_csv_into_builder().unwrap();
+        let mut plan = builder.build().unwrap();
+        plan.sort();
+        dbg!(plan);
     }
 }
