@@ -70,7 +70,13 @@ mod test {
     #[test]
     fn import_csv_to_plan_builder() {
         static TEST_PLAN: &str = "tests/data/STAPlan.csv";
+        PlanBuilder::from_csv_path(TEST_PLAN).unwrap();
+    }
+    #[test]
+    fn build_and_remove_blank_fnsku() {
+        static TEST_PLAN: &str = "tests/data/STAPlan.csv";
         let p = PlanBuilder::from_csv_path(TEST_PLAN).unwrap();
-        dbg!(&p);
+        let builds = p.build();
+        dbg!(&builds);
     }
 }
