@@ -25,7 +25,7 @@ impl Plan {
 #[derive(Debug, Default)]
 struct PlanBuilder {
     entries: Vec<Result<Entry>>,
-    keep_blank_fnsku: bool,
+    keep_error: bool,
 }
 
 impl PlanBuilder {
