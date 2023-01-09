@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 /**
@@ -62,7 +64,6 @@ impl CsvRemShipParser {
             .collect::<Vec<_>>()
     }
 }
-
 #[cfg(test)]
 mod test {
     use super::*;
