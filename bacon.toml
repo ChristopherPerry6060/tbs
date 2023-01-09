@@ -67,7 +67,7 @@ allow_warnings = true
 [keybindings]
 a = "job:check-all"
 i = "job:initial"
-o = "job:clippy-all"
+z = "job:clippy-all"
 c = "job:clippy"
 e = "job:doc"
 d = "job:doc-open"
