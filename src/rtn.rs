@@ -49,5 +49,19 @@ impl CsvRemShipParser {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+    use csv::Reader;
+    #[test]
+    fn load_removal_shipment_csv() {
+        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipment.csv";
+        let rdr = Reader::from_path(TEST_REMOVAL_SHIPMENT_RECORD).unwrap();
+        for item in rdr.into_records() {
+            let Ok(row) = item else {
+                continue;
+            };
+            dbg!(CsvRemShipParser::from_csv_record(row).unwrap());
+        }
     }
 }
