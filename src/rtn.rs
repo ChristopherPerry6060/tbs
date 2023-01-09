@@ -67,6 +67,18 @@ impl CsvRemShipParser {
 mod test {
     use super::*;
     use csv::Reader;
+    fn load_rem_shipment_report_csv() -> Vec<CsvRemShipParser> {
+        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipment.csv";
+        let rdr = Reader::from_path(TEST_REMOVAL_SHIPMENT_RECORD).unwrap();
+        rdr.into_records()
+            .filter_map(|wrapped_row| {
+                let Ok(row) = wrapped_row else {
+                return None
+            };
+                CsvRemShipParser::from_csv_record(row).ok()
+            })
+            .collect::<Vec<CsvRemShipParser>>()
+    }
     #[test]
     fn load_removal_shipment_csv() {
         static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipment.csv";
@@ -75,7 +87,18 @@ mod test {
             let Ok(row) = item else {
                 continue;
             };
-            dbg!(CsvRemShipParser::from_csv_record(row).unwrap());
+            match CsvRemShipParser::from_csv_record(row) {
+                Ok(_) => assert!(true),
+                Err(_) => assert!(false),
+            };
+        }
+    }
+    #[test]
+    fn split_tracking_numbers() {
+        let vrp = load_rem_shipment_report_csv();
+        for i in vrp.iter() {
+            let splits = i.split_tracking_numbers();
+            assert!(!splits.is_empty());
         }
     }
 }
