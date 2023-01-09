@@ -54,3 +54,23 @@ impl CustomerReturn {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn load_customer_return_csv_report() -> Vec<CustomerReturn> {
+        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/CustomerReturns.csv";
+        let rdr = Reader::from_path(TEST_REMOVAL_SHIPMENT_RECORD).unwrap();
+        rdr.into_records()
+            .filter_map(|wrapped_row| {
+                let Ok(row) = wrapped_row else {
+                return None
+            };
+                CustomerReturn::from_csv_record(row).ok()
+            })
+            .collect::<Vec<_>>()
+    }
+    #[test]
+    fn load_customer_return_csv() {
+        assert!(!load_customer_return_csv_report().is_empty());
+    }
+}
