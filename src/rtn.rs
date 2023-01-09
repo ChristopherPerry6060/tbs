@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use serde::{Deserialize, Serialize};
-
+use std::collections::HashSet;
 /**
 Csv **Rem**oval **Ship**ment Parser
 
@@ -46,6 +46,20 @@ impl CsvRemShipParser {
         ];
         let hdr_str = csv::StringRecord::from(hdr);
         csv_record.deserialize(Some(&hdr_str))
+    }
+    /**
+    Splits tracking by '`,`'. Returning the entire string if there is no '`,`'
+
+    This function will also run `trim` on each resulting string.
+    */
+    fn split_tracking_numbers<'a>(&'a self) -> Vec<&str> {
+        let tracking = &self.tracking;
+        tracking
+            .split(',')
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .map(|tracking| tracking.trim())
+            .collect::<Vec<_>>()
     }
 }
 
