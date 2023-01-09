@@ -155,6 +155,5 @@ mod test {
         let builder = load_csv_into_builder().unwrap();
         let mut plan = builder.build().unwrap();
         plan.sort();
-        dbg!(plan);
     }
 }
