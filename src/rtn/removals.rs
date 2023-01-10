@@ -1,6 +1,4 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 /**
@@ -54,7 +52,7 @@ impl CsvRemShipParser {
 
     This function will also run `trim` on each resulting string.
     */
-    fn split_tracking_numbers<'a>(&'a self) -> Vec<&str> {
+    fn split_tracking_numbers(&self) -> Vec<&str> {
         let tracking = &self.tracking;
         tracking
             .split(',')

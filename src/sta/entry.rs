@@ -33,7 +33,7 @@ pub struct Packed {
     case: Case,
 }
 impl EntryFormat for Packed {
-    fn get_fnsku<'a>(&'a self) -> &'a str {
+    fn get_fnsku(&self) -> &str {
         &self.fnsku
     }
 
@@ -53,7 +53,7 @@ impl EntryFormat for Packed {
         Some(self.case)
     }
 
-    fn try_group_name<'a>(&'a self) -> Option<&'a str> {
+    fn try_group_name(&self) -> Option<&str> {
         None
     }
 
@@ -75,7 +75,7 @@ pub struct Loose {
     group: String,
 }
 impl EntryFormat for Loose {
-    fn get_fnsku<'a>(&'a self) -> &'a str {
+    fn get_fnsku(&self) -> &str {
         &self.fnsku
     }
 
@@ -95,7 +95,7 @@ impl EntryFormat for Loose {
         None
     }
 
-    fn try_group_name<'a>(&'a self) -> Option<&'a str> {
+    fn try_group_name(&self) -> Option<&str> {
         Some(&self.group)
     }
 
@@ -104,12 +104,12 @@ impl EntryFormat for Loose {
     }
 }
 trait EntryFormat {
-    fn get_fnsku<'a>(&'a self) -> &'a str;
+    fn get_fnsku(&self) -> &str;
     fn get_units(&self) -> u32;
     fn get_weight(&self) -> u32;
     fn try_num_of_cases(&self) -> Option<u32>;
     fn try_case_dimensions(&self) -> Option<Case>;
-    fn try_group_name<'a>(&'a self) -> Option<&'a str>;
+    fn try_group_name(&self) -> Option<&str>;
     fn try_per_case(&self) -> Option<u32>;
 }
 

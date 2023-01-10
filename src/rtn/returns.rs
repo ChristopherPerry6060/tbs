@@ -1,9 +1,7 @@
 #![allow(dead_code)]
-#![allow(unused_imports)]
-use std::path::Path;
-
 use csv::Reader;
 use serde::Deserialize;
+use std::path::Path;
 
 #[derive(Deserialize, Debug, Clone)]
 struct CustomerReturn {
