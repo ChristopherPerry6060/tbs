@@ -1,1 +1,5 @@
 tests/data
+README.md
+rustfmt.toml
+bacon.toml
+Cargo.lock
