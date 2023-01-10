@@ -127,7 +127,10 @@ mod tests {
     }
     #[test]
     fn create_returns_bucket() {
-        let x = ReturnsBucket::from_csv_path(TEST_REMOVAL_SHIPMENT_RECORD);
-        dbg!(&x);
+        let rb = ReturnsBucket::from_csv_path(TEST_REMOVAL_SHIPMENT_RECORD);
+        match rb {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
     }
 }

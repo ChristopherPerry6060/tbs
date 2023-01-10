@@ -69,7 +69,7 @@ mod test {
     use super::*;
     use csv::Reader;
     fn load_rem_shipment_report_csv() -> Vec<CsvRemShipParser> {
-        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipment.csv";
+        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipments.csv";
         let rdr = Reader::from_path(TEST_REMOVAL_SHIPMENT_RECORD).unwrap();
         rdr.into_records()
             .filter_map(|wrapped_row| {
@@ -82,7 +82,7 @@ mod test {
     }
     #[test]
     fn load_removal_shipment_csv() {
-        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipment.csv";
+        static TEST_REMOVAL_SHIPMENT_RECORD: &str = "tests/data/RemovalShipments.csv";
         let rdr = Reader::from_path(TEST_REMOVAL_SHIPMENT_RECORD).unwrap();
         for item in rdr.into_records() {
             let Ok(row) = item else {
