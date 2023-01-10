@@ -1,9 +1,25 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
 use csv::Reader;
+use home::home_dir;
+use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use serde::Deserialize;
+use serde::Serialize;
 use std::path::Path;
+use thiserror::Error;
 
-#[derive(Deserialize, Debug, Clone)]
+struct Error(ErrorKind);
+type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Error, Debug)]
+enum ErrorKind {
+    #[error("Checked for a home directory.")]
+    NoHomeDirectory,
+    #[error("Pickle Database was not in expected location")]
+    NoDataDirectory,
+}
+
+#[derive(Deserialize, Debug, Clone, Serialize)]
 struct CustomerReturn {
     #[serde(alias = "return-date")]
     return_date: String,
@@ -32,8 +48,9 @@ struct CustomerReturn {
     #[serde(alias = "customer-comments")]
     customer_comments: Option<String>,
 }
+
 impl CustomerReturn {
-    fn from_csv_record(csv_record: csv::StringRecord) -> Result<Self, csv::Error> {
+    fn from_csv_record(csv_record: csv::StringRecord) -> std::result::Result<Self, csv::Error> {
         let hdr = vec![
             "return-date",
             "order-id",
@@ -53,9 +70,27 @@ impl CustomerReturn {
         csv_record.deserialize(Some(&hdr_str))
     }
 }
+
 /// The iterator that is produced by the [`ReturnsBucket`] struct.
 #[derive(Debug)]
 pub struct ReturnsBucketIter(CustomerReturn);
+impl ReturnsBucketIter {
+    fn get_description(&self) -> &str {
+        &self.0.description
+    }
+    fn get_msku(&self) -> &str {
+        &self.0.msku
+    }
+    fn get_lpn(&self) -> &str {
+        &self.0.lpn
+    }
+    fn get_asin(&self) -> &str {
+        &self.0.asin
+    }
+    fn get_fnsku(&self) -> &str {
+        &self.0.fnsku
+    }
+}
 
 /**
 A container of customer return records.
@@ -76,6 +111,31 @@ impl ReturnsBucket {
     fn push(&mut self, rb: ReturnsBucketIter) {
         self.vec.push(rb)
     }
+    fn dump(&self) -> Result<()> {
+        let path = home_dir().ok_or(Error(ErrorKind::NoHomeDirectory))?;
+        let mut pdb = PickleDb::new(
+            path,
+            PickleDbDumpPolicy::AutoDump,
+            SerializationMethod::Json,
+        );
+        for items in &self.vec {
+            #[derive(Serialize)]
+            struct Data<'a> {
+                msku: &'a str,
+                description: &'a str,
+                asin: &'a str,
+                fnsku: &'a str,
+            }
+            let data = Data {
+                msku: items.get_msku(),
+                description: items.get_description(),
+                asin: items.get_asin(),
+                fnsku: items.get_fnsku(),
+            };
+            pdb.set(data.msku, &data);
+        }
+        Ok(())
+    }
     /**
     Creates a [`ReturnsBucket`] from a Customer Returns Csv.
 
@@ -87,7 +147,7 @@ impl ReturnsBucket {
 
     Whichever path is passed to this function is not tested for existence.
     */
-    pub fn from_csv_path<P>(path: P) -> Result<Self, csv::Error>
+    pub fn from_csv_path<P>(path: P) -> std::result::Result<Self, csv::Error>
     where
         P: AsRef<Path>,
     {
